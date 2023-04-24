@@ -4,7 +4,7 @@ from pathlib import Path
 import lightning
 import numpy as np
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
+from torchvision.transforms import transforms, InterpolationMode
 
 from classify_plot_type.dataset import PlotDataset
 
@@ -23,7 +23,9 @@ class PlotDataModule(lightning.LightningDataModule):
         self._annotations_dir = annotations_dir
         self._train_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(size=(256, 256)),
+            transforms.Resize(
+                size=(256, 256),
+                interpolation=InterpolationMode.BICUBIC),
             transforms.RandomCrop(size=(240, 240)),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
@@ -31,7 +33,10 @@ class PlotDataModule(lightning.LightningDataModule):
         ])
         self._test_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize(size=(256, 256)),
+            transforms.Resize(
+                size=(256, 256),
+                interpolation=InterpolationMode.BICUBIC
+            ),
             transforms.CenterCrop(size=(240, 240)),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
