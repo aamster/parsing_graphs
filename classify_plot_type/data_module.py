@@ -69,6 +69,7 @@ class PlotDataModule(lightning.LightningDataModule):
             self._train,
             batch_size=self._batch_size,
             num_workers=self._num_workers
+        )
 
     def val_dataloader(self):
         return DataLoader(
