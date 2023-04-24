@@ -3,8 +3,7 @@ from pathlib import Path
 
 import lightning
 import numpy as np
-import torch
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
 from classify_plot_type.dataset import PlotDataset
@@ -14,6 +13,7 @@ class PlotDataModule(lightning.LightningDataModule):
     def __init__(
         self,
         batch_size: int,
+        num_workers: int,
         plots_dir,
         annotations_dir
     ):
@@ -39,6 +39,7 @@ class PlotDataModule(lightning.LightningDataModule):
         ])
         self._train = None
         self._val = None
+        self._num_workers = num_workers
 
     def setup(self, stage: str):
         if stage == "fit":
@@ -67,11 +68,11 @@ class PlotDataModule(lightning.LightningDataModule):
         return DataLoader(
             self._train,
             batch_size=self._batch_size,
-            num_workers=12)
+            num_workers=self._num_workers
 
     def val_dataloader(self):
         return DataLoader(
             self._val,
             batch_size=self._batch_size,
-            num_workers=12
+            num_workers=self._num_workers
         )
