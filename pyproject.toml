@@ -1,0 +1,26 @@
+# -----------------------------------------------------------------------------
+##  Build System Configurations
+#   https://setuptools.pypa.io/en/latest/setuptools.html#building-and-distributing-packages-with-setuptools
+# -----------------------------------------------------------------------------
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "parsing_graphs"
+description = "parse graph dataset"
+dynamic = [ "version"]
+requires-python = ">=3.8"
+
+dependencies = [
+    "torch",
+    "lightning",
+    "numpy",
+    "torchvision",
+    "matplotlib"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
