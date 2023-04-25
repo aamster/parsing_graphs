@@ -1,3 +1,5 @@
+from typing import Dict
+
 import lightning
 import torch.nn
 import torchmetrics
@@ -7,7 +9,8 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
     def __init__(
         self,
         learning_rate,
-        model: torch.nn.Module
+        model: torch.nn.Module,
+        hyperparams: Dict
     ):
         super().__init__()
         num_classes = 5
@@ -26,6 +29,7 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
             num_classes=num_classes
         )
         self._learning_rate = learning_rate
+        self._hyperparams = hyperparams
 
     def training_step(self, batch, batch_idx):
         data, target = batch
@@ -50,6 +54,9 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         self.val_precision.update(preds=preds, target=target)
         self.val_recall.update(preds=preds, target=target)
         self.val_f1.update(preds=preds, target=target)
+
+    def on_train_start(self) -> None:
+        self.logger.log_hyperparams(params=self._hyperparams)
 
     def on_train_epoch_end(self) -> None:
         self.logger.log_metrics({
