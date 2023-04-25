@@ -19,7 +19,8 @@ dependencies = [
     "lightning",
     "numpy",
     "torchvision",
-    "matplotlib"
+    "matplotlib",
+    "mlflow"
 ]
 
 [tool.setuptools.packages.find]

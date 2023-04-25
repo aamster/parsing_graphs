@@ -33,24 +33,39 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         loss = self._loss_function(logits, target)
         preds = torch.argmax(logits, dim=1)
 
-        self.train_f1.update(preds=preds, target=target)
+        self.train_f1.update(preds, target)
         self.log("train_loss", loss, prog_bar=True)
+        self.logger.log_metrics({
+            'train_loss': loss,
+        }, step=self.global_step)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
         logits = self.model(data)
         loss = self._loss_function(logits, target)
+        self.log('val_loss', loss, on_epoch=True, prog_bar=True)
 
         preds = torch.argmax(logits, dim=1)
         self.val_precision.update(preds=preds, target=target)
         self.val_recall.update(preds=preds, target=target)
         self.val_f1.update(preds=preds, target=target)
 
-        self.log("val_loss", loss, prog_bar=True)
-        self.log("val_f1", self.val_f1, prog_bar=True)
-        self.log("val_precision", self.val_precision)
-        self.log("val_recall", self.val_recall)
+    def on_train_epoch_end(self) -> None:
+        self.logger.log_metrics({
+            'train_f1': self.train_f1.compute().item()
+        }, step=self.current_epoch)
+        self.train_f1.reset()
+
+    def on_validation_epoch_end(self) -> None:
+        self.logger.log_metrics({
+            'val_f1': self.val_f1.compute().item(),
+            'val_precision': self.val_precision.compute().item(),
+            'val_recall': self.val_recall.compute().item()
+        }, step=self.current_epoch)
+        self.val_f1.reset()
+        self.val_precision.reset()
+        self.val_recall.reset()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
