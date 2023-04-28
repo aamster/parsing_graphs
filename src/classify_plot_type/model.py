@@ -65,6 +65,7 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         self.train_f1.reset()
 
     def on_validation_epoch_end(self) -> None:
+        self.log('val_f1', self.val_f1.compute().item())
         self.logger.log_metrics({
             'val_f1': self.val_f1.compute().item(),
             'val_precision': self.val_precision.compute().item(),
