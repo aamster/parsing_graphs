@@ -82,3 +82,10 @@ class PlotDataModule(lightning.LightningDataModule):
             batch_size=self._batch_size,
             num_workers=self._num_workers
         )
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self._val,
+            batch_size=self._batch_size,
+            num_workers=self._num_workers
+        )
