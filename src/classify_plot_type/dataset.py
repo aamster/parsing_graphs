@@ -39,11 +39,15 @@ class PlotDataset(torch.utils.data.Dataset):
 
         plot_bb = a['plot-bb']
 
+        # Correct for negative positions
+        y0 = max(0, plot_bb['y0'])
+        x0 = max(0, plot_bb['x0'])
+
         # Limit to the plot bounding box to exclude title/axes, etc
         data = data.copy()
         data = data[
-               plot_bb['y0']:plot_bb['y0'] + plot_bb['height'],
-               plot_bb['x0']:plot_bb['x0'] + plot_bb['width']]
+               y0:y0 + plot_bb['height'],
+               x0:x0 + plot_bb['width']]
         target = self._plot_type_id_map[a['chart-type']]
 
         data = self._transform(data)
