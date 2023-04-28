@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 
 import lightning
 import torch.nn
@@ -55,6 +55,17 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         self.val_recall.update(preds=preds, target=target)
         self.val_f1.update(preds=preds, target=target)
 
+    def predict_step(
+            self,
+            batch: Any,
+            batch_idx: int,
+            dataloader_idx: int = 0
+    ):
+        data, target = batch
+        logits = self.model(data)
+        preds = torch.argmax(logits, dim=1)
+        return preds
+
     def on_train_start(self) -> None:
         self.logger.log_hyperparams(params=self._hyperparams)
 
@@ -65,7 +76,7 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         self.train_f1.reset()
 
     def on_validation_epoch_end(self) -> None:
-        self.log('val_f1', self.val_f1.compute().item())
+        self.log('val_f1', self.val_f1.compute().item(), on_epoch=True)
         self.logger.log_metrics({
             'val_f1': self.val_f1.compute().item(),
             'val_precision': self.val_precision.compute().item(),
