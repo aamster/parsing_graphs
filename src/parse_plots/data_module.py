@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 import lightning
 import numpy as np
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms, InterpolationMode
+from torchvision.transforms import transforms
 
-from classify_plot_type.dataset import PlotDataset
+from parse_plots.classify_plot_type.dataset import PlotDataset
 
 
 class PlotDataModule(lightning.LightningDataModule):
@@ -15,33 +16,16 @@ class PlotDataModule(lightning.LightningDataModule):
         batch_size: int,
         num_workers: int,
         plots_dir,
-        annotations_dir
+        annotations_dir,
+        train_transform: Optional[transforms.Compose] = None,
+        inference_transform: Optional[transforms.Compose] = None
     ):
         super().__init__()
         self._batch_size = batch_size
         self._plots_dir = plots_dir
         self._annotations_dir = annotations_dir
-        self._train_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize(
-                size=(256, 256),
-                interpolation=InterpolationMode.BICUBIC),
-            transforms.RandomCrop(size=(240, 240)),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225])
-        ])
-        self._test_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize(
-                size=(256, 256),
-                interpolation=InterpolationMode.BICUBIC
-            ),
-            transforms.CenterCrop(size=(240, 240)),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225])
-        ])
+        self._train_transform = train_transform
+        self._test_transform = inference_transform
         self._train = None
         self._val = None
         self._num_workers = num_workers
