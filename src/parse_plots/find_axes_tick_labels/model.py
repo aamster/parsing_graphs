@@ -83,13 +83,13 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         for pred_idx, pred in enumerate(preds):
             masks = torch.zeros_like(preds[pred_idx]['masks'],
                                      dtype=torch.uint8)
-            if len(masks.shape) == 4:
-                masks = masks.squeeze()
-
             for mask_idx, mask in enumerate(pred['masks']):
-                mask = (mask > 0.5).type(torch.uint8).squeeze()
+                mask = (mask > 0.5).type(torch.uint8)
                 masks[mask_idx] = mask
             preds[pred_idx]['masks'] = masks
+            if len(preds[pred_idx]['masks'].shape) == 4:
+                preds[pred_idx]['masks'] = preds[pred_idx]['masks'].squeeze(
+                    dim=1)
 
         return preds
 
