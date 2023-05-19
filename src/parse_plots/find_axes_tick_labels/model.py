@@ -82,10 +82,12 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         # threshold soft masks
         for pred_idx, pred in enumerate(preds):
             masks = torch.zeros_like(preds[pred_idx]['masks'],
-                                     dtype=torch.uint8).squeeze()
+                                     dtype=torch.uint8)
+            if len(masks.shape) == 4:
+                masks = masks.squeeze()
+
             for mask_idx, mask in enumerate(pred['masks']):
-                mask = (preds[pred_idx]['masks'][mask_idx] > 0.5).type(
-                    torch.uint8)
+                mask = (mask > 0.5).type(torch.uint8).squeeze()
                 masks[mask_idx] = mask
             preds[pred_idx]['masks'] = masks
 
