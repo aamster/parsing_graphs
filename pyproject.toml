@@ -20,7 +20,8 @@ dependencies = [
     "numpy",
     "torchvision",
     "matplotlib",
-    "mlflow"
+    "mlflow",
+    "pycocotools"
 ]
 
 [tool.setuptools.packages.find]

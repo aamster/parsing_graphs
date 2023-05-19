@@ -46,7 +46,8 @@ class PlotDataset(torch.utils.data.Dataset):
             img=img
         )
         if self._transform is not None:
-            img, boxes, masks = self._transform(img, boxes, masks)
+            img, boxes, masks, labels = self._transform(
+                img, boxes, masks, labels)
 
         target = {
             'boxes': boxes,
@@ -78,7 +79,10 @@ class PlotDataset(torch.utils.data.Dataset):
         bboxes = datapoints.BoundingBox(
             bboxes,
             format=datapoints.BoundingBoxFormat.XYXY,
-            spatial_size=F.get_spatial_size(img))
+            spatial_size=F.get_spatial_size(img),
+            dtype=torch.float
+        )
+
         return bboxes
 
     @staticmethod
@@ -116,5 +120,5 @@ class PlotDataset(torch.utils.data.Dataset):
             mask = np.zeros((img.shape[1], img.shape[2]), dtype='uint8')
             cv2.fillPoly(mask, pts=[polygon], color=1)
             masks[i] = mask
-        masks = datapoints.Mask(masks)
+        masks = datapoints.Mask(masks, dtype=torch.uint8)
         return masks
