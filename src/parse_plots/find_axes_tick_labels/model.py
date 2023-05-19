@@ -48,10 +48,12 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         loss = sum(loss for loss in losses.values())
 
         self.log("train_loss", loss, prog_bar=True)
-        self.logger.log_metrics({
+        metrics = {
             f'train_{loss_name}': loss
             for loss_name, loss in losses.items()
-        }, step=self.global_step)
+        }
+        metrics['train_loss'] = loss
+        self.logger.log_metrics(metrics, step=self.global_step)
 
         preds = self._get_predictions(batch=batch)
         self.train_map.update(preds=preds, target=target)
