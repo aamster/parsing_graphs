@@ -61,7 +61,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
-        preds = self.model(data)
+        preds = self._get_predictions(batch=batch)
         self.val_map.update(preds=preds, target=target)
 
     def predict_step(
