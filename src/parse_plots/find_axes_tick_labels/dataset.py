@@ -20,6 +20,11 @@ class PlotDataset(torch.utils.data.Dataset):
         transform
     ):
         super().__init__()
+        # these lack labeled ticks
+        bad_ids = ['733b9b19e09a', 'aa9df520a5f2', '04296b42ba61',
+                   '3968efe9cbfc', '6ce4bc728dd5', 'd0cf883b1e13']
+
+        plot_ids = [x for x in plot_ids if x not in bad_ids]
         plot_ids = set(plot_ids)
         plot_files = os.listdir(plots_dir)
         self._plot_files = [x for x in plot_files if Path(x).stem in plot_ids]
@@ -36,11 +41,13 @@ class PlotDataset(torch.utils.data.Dataset):
             a = json.load(f)
 
         tick_labels = [x for x in a['text'] if x['role'] == 'tick_label']
+        labels, tick_labels = \
+            self._get_labels(axes=a['axes'], tick_labels=tick_labels)
+
         boxes = self._get_bboxes(
             tick_labels=tick_labels,
             img=img
         )
-        labels = self._get_labels(axes=a['axes'], tick_labels=tick_labels)
         masks = self._get_masks(
             tick_labels=tick_labels,
             img=img
@@ -87,7 +94,9 @@ class PlotDataset(torch.utils.data.Dataset):
 
     @staticmethod
     def _get_labels(axes: Dict, tick_labels: List[Dict]):
-        """Gets whether axis label is part of x or y axis"""
+        """Gets whether axis label is part of x or y axis
+        Also modifies tick_labels to exclude any not in axes
+        """
         axes_label_map = {
             'x-axis': 0,
             'y-axis': 1
@@ -99,11 +108,15 @@ class PlotDataset(torch.utils.data.Dataset):
             for tick in ticks:
                 tick_axis_map[tick['id']] = axes_label_map[axis]
 
+        # There are some labels erroneously marked as tick labels that are
+        # not tick labels and don't appear in "ticks"
+        tick_labels = [x for x in tick_labels if x['id'] in tick_axis_map]
+
         labels = torch.tensor(
             [tick_axis_map[tick['id']] for tick in tick_labels],
             dtype=torch.int64
         )
-        return labels
+        return labels, tick_labels
 
     @staticmethod
     def _get_masks(
