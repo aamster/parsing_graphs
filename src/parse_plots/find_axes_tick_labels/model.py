@@ -44,14 +44,12 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         # sums the classification and regression losses for both the
         # RPN and the R-CNN, and the mask loss
         loss = sum(loss for loss in losses.values())
-
-        self.log("train_loss", loss, prog_bar=True)
         metrics = {
             f'train_{loss_name}': loss
             for loss_name, loss in losses.items()
         }
         metrics['train_loss'] = loss
-        self.logger.log_metrics(metrics, step=self.global_step)
+        self.log_dict(metrics)
 
         preds = self._get_predictions(batch=batch)
         self.train_map.update(preds=preds, target=target)
@@ -95,17 +93,16 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.logger.log_hyperparams(params=self._hyperparams)
 
     def on_train_epoch_end(self) -> None:
-        self.logger.log_metrics({
+        self.log_dict({
             'train_map': self.train_map.compute()['map'].item()
-        }, step=self.current_epoch)
+        })
         self.train_map.reset()
 
     def on_validation_epoch_end(self) -> None:
         map = self.val_map.compute()['map'].item()
-        self.log('val_map', map, on_epoch=True)
-        self.logger.log_metrics({
+        self.log_dict({
             'val_map': map
-        }, step=self.current_epoch)
+        })
         self.val_map.reset()
 
     def configure_optimizers(self):
