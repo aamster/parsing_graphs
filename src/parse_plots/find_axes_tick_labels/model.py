@@ -29,12 +29,10 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.model = model
 
         self.train_map = MeanAveragePrecision(
-            iou_type='segm',
-            max_detection_thresholds=[50]
+            iou_type='segm'
         )
         self.val_map = MeanAveragePrecision(
-            iou_type='segm',
-            max_detection_thresholds=[50]
+            iou_type='segm'
         )
         self._learning_rate = learning_rate
         self._hyperparams = hyperparams
