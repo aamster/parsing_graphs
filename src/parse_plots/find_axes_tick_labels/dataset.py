@@ -97,9 +97,10 @@ class PlotDataset(torch.utils.data.Dataset):
         """Gets whether axis label is part of x or y axis
         Also modifies tick_labels to exclude any not in axes
         """
+        # 0 indicates background - IMPORTANT !!
         axes_label_map = {
-            'x-axis': 0,
-            'y-axis': 1
+            'x-axis': 1,
+            'y-axis': 2
         }
 
         tick_axis_map = {}
