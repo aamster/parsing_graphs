@@ -52,6 +52,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.log_dict(metrics)
 
         preds = self._get_predictions(batch=batch)
+        print([type(target['masks']) for t in target])
         self.train_map.update(preds=preds, target=target)
         return loss
 
