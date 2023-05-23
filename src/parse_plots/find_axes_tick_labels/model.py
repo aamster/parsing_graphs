@@ -113,7 +113,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
     def _convert_masks_to_tensor(self, target):
         for i in range(len(target)):
-            if not isinstance(target[i]['masks'], torch.Tensor):
+            if type(target[i]['masks']) is not torch.Tensor:
                 target[i]['masks'] = target[i]['masks'].data
         return target
 
