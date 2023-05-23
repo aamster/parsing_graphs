@@ -22,7 +22,8 @@ dependencies = [
     "torchvision",
     "matplotlib",
     "mlflow",
-    "pycocotools"
+    "pycocotools",
+    "opencv-python-headless"
 ]
 
 [tool.setuptools.packages.find]
