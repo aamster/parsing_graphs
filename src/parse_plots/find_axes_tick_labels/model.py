@@ -52,13 +52,14 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.log_dict(metrics)
 
         preds = self._get_predictions(batch=batch)
-        print([type(t['masks']) for t in target])
+        target = self._convert_masks_to_tensor(target=target)
         self.train_map.update(preds=preds, target=target)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
         preds = self._get_predictions(batch=batch)
+        target = self._convert_masks_to_tensor(target=target)
         self.val_map.update(preds=preds, target=target)
 
     def predict_step(
@@ -109,3 +110,10 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
         return optimizer
+
+    def _convert_masks_to_tensor(self, target):
+        for i in range(len(target)):
+            if not isinstance(target[i]['masks'], torch.Tensor):
+                target[i]['masks'] = target[i]['masks'].data
+        return target
+
