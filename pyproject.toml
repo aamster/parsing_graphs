@@ -17,6 +17,7 @@ requires-python = ">=3.7"
 dependencies = [
     "torch",
     "lightning",
+    "https://github.com/Lightning-AI/torchmetrics/archive/master.zip",
     "numpy",
     "torchvision",
     "matplotlib",
