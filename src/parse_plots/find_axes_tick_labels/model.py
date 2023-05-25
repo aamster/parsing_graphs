@@ -24,7 +24,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self,
         learning_rate,
         model: torch.nn.Module,
-        hyperparams: Dict
+        hyperparams: Dict,
+        box_outlier_threshold: float = 1.5
     ):
         super().__init__()
         self.model = model
@@ -39,6 +40,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         )
         self._learning_rate = learning_rate
         self._hyperparams = hyperparams
+        self._box_outlier_threshold = box_outlier_threshold
 
     def training_step(self, batch, batch_idx):
         data, target = batch
@@ -132,8 +134,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
                 target[i]['masks'] = target[i]['masks'].data
         return target
 
-    @staticmethod
-    def _remove_outlier_box_predictions(pred: Dict):
+    def _remove_outlier_box_predictions(self, pred: Dict):
         """Sometimes there are stray boxes that are not axes labels.
         This tries to remove those"""
         label_int_str_map = {
@@ -164,8 +165,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
             Q1, Q3 = np.quantile(center, (0.25, 0.75))
             IQR = Q3 - Q1
-            lower = Q1 - 3.0 * IQR
-            upper = Q3 + 3.0 * IQR
+            lower = Q1 - self._box_outlier_threshold * IQR
+            upper = Q3 + self._box_outlier_threshold * IQR
 
             preds['boxes'].append(boxes[
                                       (center >= lower) &
