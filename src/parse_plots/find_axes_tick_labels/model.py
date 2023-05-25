@@ -134,9 +134,16 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
     @staticmethod
     def _remove_outlier_box_predictions(pred: Dict):
+        """Sometimes there are stray boxes that are not axes labels.
+        This tries to remove those"""
         label_int_str_map = {
             1: 'x-axis',
             2: 'y-axis'
+        }
+        preds = {
+            'boxes': [],
+            'masks': [],
+            'labels': []
         }
         for label in (1, 2):
             label_idx = np.where(pred['labels'] == label)[0]
@@ -148,13 +155,20 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
             Q1, Q3 = np.quantile(top_left, (0.25, 0.75))
             IQR = Q3 - Q1
-            lower = Q1 - 1.5 * IQR
-            upper = Q3 + 1.5 * IQR
+            lower = Q1 - 7.0 * IQR
+            upper = Q3 + 7.0 * IQR
 
-            pred['boxes'][label_idx] = pred['boxes'][label_idx][
-                (top_left >= lower) & (top_left <= upper)]
-            pred['masks'][label_idx] = pred['masks'][label_idx][
-                (top_left >= lower) & (top_left <= upper)]
-            pred['labels'][label_idx] = pred['labels'][label_idx][
-                (top_left >= lower) & (top_left <= upper)]
-        return pred
+            preds['boxes'].append(boxes[
+                                      (top_left >= lower) &
+                                      (top_left <= upper)])
+            preds['masks'].append(pred['masks'][label_idx][
+                                      (top_left >= lower) &
+                                      (top_left <= upper)])
+            preds['labels'].append(pred['labels'][label_idx][
+                                      (top_left >= lower) &
+                                      (top_left <= upper)])
+        preds['boxes'] = torch.concatenate(preds['boxes'])
+        preds['masks'] = torch.concatenate(preds['masks'])
+        preds['labels'] = torch.concatenate(preds['labels'])
+
+        return preds
