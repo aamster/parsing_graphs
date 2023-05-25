@@ -25,7 +25,6 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         learning_rate,
         model: torch.nn.Module,
         hyperparams: Dict,
-        box_outlier_threshold: float = 1.5
     ):
         super().__init__()
         self.model = model
@@ -40,7 +39,6 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         )
         self._learning_rate = learning_rate
         self._hyperparams = hyperparams
-        self._box_outlier_threshold = box_outlier_threshold
 
     def training_step(self, batch, batch_idx):
         data, target = batch
