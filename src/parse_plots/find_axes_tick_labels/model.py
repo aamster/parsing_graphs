@@ -145,28 +145,37 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             'masks': [],
             'labels': []
         }
+
+        def get_box_center(box):
+            x1, y1, x2, y2 = box
+            w = x2 - x1
+            h = y2 - y1
+            return x1 + int(w / 2), y1 + int(h / 2)
+
         for label in (1, 2):
             label_idx = np.where(pred['labels'] == label)[0]
             boxes = pred['boxes'][label_idx]
-            if label_int_str_map[label] == 'x-axis':
-                top_left = np.array([b[1] for b in boxes])
-            else:
-                top_left = np.array([b[0] for b in boxes])
+            centers = [get_box_center(box=box) for box in boxes]
 
-            Q1, Q3 = np.quantile(top_left, (0.25, 0.75))
+            if label_int_str_map[label] == 'x-axis':
+                center = np.array([c[1] for c in centers])
+            else:
+                center = np.array([c[0] for c in centers])
+
+            Q1, Q3 = np.quantile(center, (0.25, 0.75))
             IQR = Q3 - Q1
-            lower = Q1 - 7.0 * IQR
-            upper = Q3 + 7.0 * IQR
+            lower = Q1 - 3.0 * IQR
+            upper = Q3 + 3.0 * IQR
 
             preds['boxes'].append(boxes[
-                                      (top_left >= lower) &
-                                      (top_left <= upper)])
+                                      (center >= lower) &
+                                      (center <= upper)])
             preds['masks'].append(pred['masks'][label_idx][
-                                      (top_left >= lower) &
-                                      (top_left <= upper)])
+                                      (center >= lower) &
+                                      (center <= upper)])
             preds['labels'].append(pred['labels'][label_idx][
-                                      (top_left >= lower) &
-                                      (top_left <= upper)])
+                                      (center >= lower) &
+                                      (center <= upper)])
         preds['boxes'] = torch.concatenate(preds['boxes'])
         preds['masks'] = torch.concatenate(preds['masks'])
         preds['labels'] = torch.concatenate(preds['labels'])
