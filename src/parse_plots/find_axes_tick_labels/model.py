@@ -149,6 +149,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             lower = Q1 - 1.5 * IQR
             upper = Q3 + 1.5 * IQR
 
-            pred['boxes'] = pred['boxes'][lower <= top_left <= upper]
-            pred['masks'] = pred['masks'][lower <= top_left <= upper]
+            pred['boxes'] = pred['boxes'][
+                (top_left >= lower) & (top_left <= upper)]
+            pred['masks'] = pred['masks'][
+                (top_left >= lower) & (top_left <= upper)]
         return pred
