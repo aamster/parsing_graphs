@@ -77,6 +77,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             # only include confident predictions
             preds[i]['boxes'] = preds[i]['boxes'][preds[i]['scores'] > 0.5]
             preds[i]['masks'] = preds[i]['masks'][preds[i]['scores'] > 0.5]
+            preds[i]['labels'] = preds[i]['labels'][preds[i]['scores'] > 0.5]
 
             preds[i] = self._remove_outlier_box_predictions(
                 pred=preds[i]
