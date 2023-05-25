@@ -1,7 +1,8 @@
 from contextlib import contextmanager
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import lightning
+import numpy as np
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 
@@ -71,6 +72,16 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         preds = self._get_predictions(batch=batch)
+
+        for i in range(len(preds)):
+            # only include confident predictions
+            preds[i]['boxes'] = preds[i]['boxes'][preds[i]['scores'] > 0.5]
+            preds[i]['masks'] = preds[i]['masks'][preds[i]['scores'] > 0.5]
+
+            preds[i] = self._remove_outlier_box_predictions(
+                pred=preds[i]
+            )
+
         return preds
 
     def _get_predictions(self, batch):
@@ -113,9 +124,31 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
         return optimizer
 
-    def _convert_masks_to_tensor(self, target):
+    @staticmethod
+    def _convert_masks_to_tensor(target):
         for i in range(len(target)):
             if type(target[i]['masks']) is not torch.Tensor:
                 target[i]['masks'] = target[i]['masks'].data
         return target
 
+    @staticmethod
+    def _remove_outlier_box_predictions(pred: Dict):
+        label_int_str_map = {
+            1: 'x-axis',
+            2: 'y-axis'
+        }
+        for label in (1, 2):
+            boxes = pred['boxes'][pred['labels'] == label]
+            if label_int_str_map[label] == 'x-axis':
+                top_left = np.array([b[1] for b in boxes])
+            else:
+                top_left = np.array([b[0] for b in boxes])
+
+            Q1, Q3 = np.quantile(top_left, (0.25, 0.75))
+            IQR = Q3 - Q1
+            lower = Q1 - 1.5 * IQR
+            upper = Q3 + 1.5 * IQR
+
+            pred['boxes'] = pred['boxes'][lower <= top_left <= upper]
+            pred['masks'] = pred['masks'][lower <= top_left <= upper]
+        return pred

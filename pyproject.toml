@@ -23,7 +23,8 @@ dependencies = [
     "matplotlib",
     "mlflow",
     "pycocotools",
-    "opencv-python-headless"
+    "opencv-python-headless",
+    "boto3"
 ]
 
 [tool.setuptools.packages.find]
