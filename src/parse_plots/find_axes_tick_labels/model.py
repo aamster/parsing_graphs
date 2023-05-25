@@ -147,36 +147,53 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             'labels': []
         }
 
-        def get_box_center(box):
-            x1, y1, x2, y2 = box
-            w = x2 - x1
-            h = y2 - y1
-            return x1 + int(w / 2), y1 + int(h / 2)
+        def does_box_overlap(box, other_boxes, axis):
+            box_x1, box_y1, box_x2, box_y2 = box
+            for other_box in other_boxes:
+                other_x1, other_y1, other_x2, other_y2 = other_box
+
+                if axis == 'x-axis':
+                    box1, box2 = [box_y1, box_y2]
+                    other1, other2 = [other_y1, other_y2]
+                else:
+                    box1, box2 = [box_x1, box_x2]
+                    other1, other2 = [other_x1, other_x2]
+
+                #   ---------
+                # --------------
+                if box1 >= other1 and box2 <= other2:
+                    return True
+
+                # --------------
+                #   ---------
+                if box1 <= other1 and box2 >= other2:
+                    return True
+
+                # --------------
+                #           ---------
+                if box1 <= other1 <= box2 <= other2:
+                    return True
+
+                #            ---------
+                # --------------
+                if other1 <= box1 <= other2:
+                    return True
+            return False
 
         for label in (1, 2):
             label_idx = np.where(pred['labels'] == label)[0]
             boxes = pred['boxes'][label_idx]
-            centers = [get_box_center(box=box) for box in boxes]
+            overlap = [
+                does_box_overlap(
+                    box=boxes[i],
+                    other_boxes=boxes[[idx for idx in range(len(boxes)) if idx != i]],
+                    axis=label_int_str_map[label]
+                ) for i in range(len(boxes))
+            ]
 
-            if label_int_str_map[label] == 'x-axis':
-                center = np.array([c[1] for c in centers])
-            else:
-                center = np.array([c[0] for c in centers])
-
-            Q1, Q3 = np.quantile(center, (0.25, 0.75))
-            IQR = Q3 - Q1
-            lower = Q1 - self._box_outlier_threshold * IQR
-            upper = Q3 + self._box_outlier_threshold * IQR
-
-            preds['boxes'].append(boxes[
-                                      (center >= lower) &
-                                      (center <= upper)])
-            preds['masks'].append(pred['masks'][label_idx][
-                                      (center >= lower) &
-                                      (center <= upper)])
-            preds['labels'].append(pred['labels'][label_idx][
-                                      (center >= lower) &
-                                      (center <= upper)])
+            preds['boxes'].append(boxes[overlap])
+            preds['masks'].append(pred['masks'][label_idx][overlap])
+            preds['labels'].append(pred['labels'][label_idx][overlap])
         preds['boxes'] = torch.concatenate(preds['boxes'])
         preds['masks'] = torch.concatenate(preds['masks'])
         preds['labels'] = torch.concatenate(preds['labels'])
