@@ -139,7 +139,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             2: 'y-axis'
         }
         for label in (1, 2):
-            boxes = pred['boxes'][pred['labels'] == label]
+            label_idx = np.where(pred['labels'] == label)[0]
+            boxes = pred['boxes'][label_idx]
             if label_int_str_map[label] == 'x-axis':
                 top_left = np.array([b[1] for b in boxes])
             else:
@@ -150,8 +151,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             lower = Q1 - 1.5 * IQR
             upper = Q3 + 1.5 * IQR
 
-            pred['boxes'] = pred['boxes'][
+            pred['boxes'][label_idx] = pred['boxes'][label_idx][
                 (top_left >= lower) & (top_left <= upper)]
-            pred['masks'] = pred['masks'][
+            pred['masks'][label_idx] = pred['masks'][label_idx][
                 (top_left >= lower) & (top_left <= upper)]
         return pred
