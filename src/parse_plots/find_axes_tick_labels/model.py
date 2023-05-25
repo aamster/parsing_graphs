@@ -147,36 +147,40 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
         def does_box_overlap(box, other_boxes, axis):
             box_x1, box_y1, box_x2, box_y2 = box
-            for other_box in other_boxes:
-                other_x1, other_y1, other_x2, other_y2 = other_box
+            if axis == 'x-axis':
+                box1, box2 = [box_y1, box_y2]
+                other1, other2 = [
+                    np.quantile([x[1] for x in other_boxes], 0.5),
+                    np.quantile([x[3] for x in other_boxes], 0.5)
+                ]
+            else:
+                box1, box2 = [box_x1, box_x2]
+                other1, other2 = [
+                    np.quantile([x[0] for x in other_boxes], 0.5),
+                    np.quantile([x[2] for x in other_boxes], 0.5)
+                ]
 
-                if axis == 'x-axis':
-                    box1, box2 = [box_y1, box_y2]
-                    other1, other2 = [other_y1, other_y2]
-                else:
-                    box1, box2 = [box_x1, box_x2]
-                    other1, other2 = [other_x1, other_x2]
+            #   ---------
+            # --------------
+            if box1 >= other1 and box2 <= other2:
+                return True
 
-                #   ---------
-                # --------------
-                if box1 >= other1 and box2 <= other2:
-                    return True
+            # --------------
+            #   ---------
+            elif box1 <= other1 and box2 >= other2:
+                return True
 
-                # --------------
-                #   ---------
-                if box1 <= other1 and box2 >= other2:
-                    return True
+            # --------------
+            #           ---------
+            elif box1 <= other1 <= box2 <= other2:
+                return True
 
-                # --------------
-                #           ---------
-                if box1 <= other1 <= box2 <= other2:
-                    return True
-
-                #            ---------
-                # --------------
-                if other1 <= box1 <= other2:
-                    return True
-            return False
+            #            ---------
+            # --------------
+            elif other1 <= box1 <= other2:
+                return True
+            else:
+                return False
 
         for label in (1, 2):
             label_idx = np.where(pred['labels'] == label)[0]
