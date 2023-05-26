@@ -57,6 +57,7 @@ class PlotDataset(torch.utils.data.Dataset):
                 img, boxes, masks, labels)
 
         target = {
+            'image_id': id,
             'boxes': boxes,
             'labels': labels,
             'masks': masks
