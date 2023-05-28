@@ -4,6 +4,8 @@ import lightning
 import torch.nn
 import torchmetrics
 
+from parse_plots.classify_plot_type.dataset import plot_id_type_map
+
 
 class ClassifyPlotTypeModel(lightning.LightningModule):
     def __init__(
@@ -64,7 +66,8 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
         data, target = batch
         logits = self.model(data)
         preds = torch.argmax(logits, dim=1)
-        return preds
+
+        return [plot_id_type_map[pred.item()] for pred in preds]
 
     def on_train_start(self) -> None:
         self.logger.log_hyperparams(params=self._hyperparams)
