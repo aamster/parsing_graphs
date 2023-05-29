@@ -1,5 +1,3 @@
-import json
-import logging
 import os
 from pathlib import Path
 from typing import Dict
@@ -8,6 +6,7 @@ import argschema as argschema
 import numpy as np
 import pandas as pd
 import torch
+import torchvision
 from lightning import Trainer
 from torch import nn
 from torch.utils.data import DataLoader
@@ -24,6 +23,8 @@ from parse_plots.classify_plot_type.model import ClassifyPlotTypeModel
 from parse_plots.detect_axes_labels_text.detect_text import DetectText
 from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset
 from parse_plots.find_axes_tick_labels.model import SegmentAxesTickLabelsModel
+
+torchvision.disable_beta_transforms_warning()
 
 
 class ParsePlotsSchema(argschema.ArgSchema):
@@ -67,10 +68,12 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     def _classify_plot_type(self):
         transforms = T.Compose([
-            T.ToTensor(),
+            T.ToImageTensor(),
+            T.ConvertImageDtype(torch.float32),
             T.Resize(
                 size=(256, 256),
-                interpolation=InterpolationMode.BICUBIC
+                interpolation=InterpolationMode.BICUBIC,
+                antialias=True
             ),
             T.CenterCrop(size=(240, 240)),
             T.Normalize(
@@ -121,7 +124,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         transforms = T.Compose([
             T.ToImageTensor(),
             T.ConvertImageDtype(torch.float32),
-            T.Resize([448, 448]),
+            T.Resize([448, 448], antialias=True),
             T.SanitizeBoundingBox(labels_getter=lambda inputs: inputs[3])
         ])
 

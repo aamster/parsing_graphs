@@ -25,7 +25,8 @@ dependencies = [
     "pycocotools",
     "opencv-python-headless",
     "boto3",
-    "pytesseract"
+    "pytesseract",
+    "scikit-learn"
 ]
 
 [tool.setuptools.packages.find]

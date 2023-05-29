@@ -1,18 +1,44 @@
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Union
 
 import cv2
 import numpy as np
+import pandas as pd
 import pytesseract
 import torch
 from PIL import Image
+from sklearn.linear_model import LinearRegression
 from torchvision import datapoints
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
 from tqdm import tqdm
 
 from parse_plots.find_axes_tick_labels.dataset import axes_label_map
+
+plot_expected_type_map = {
+    'vertical_bar': {
+        'x-axis': ['categorical', 'numeric'],
+        'y-axis': 'numeric'
+    },
+    'horizontal_bar': {
+        'x-axis': 'numeric',
+        'y-axis': 'categorical'
+    },
+    'dot': {
+        'x-axis': ['categorical', 'numeric'],
+        'y-axis': ['numeric', None]
+    },
+    'line': {
+        'x-axis': ['categorical', 'numeric'],
+        'y-axis': 'numeric'
+    },
+    'scatter': {
+        'x-axis': 'numeric',
+        'y-axis': 'numeric'
+    }
+
+}
 
 
 class DetectText:
@@ -82,11 +108,22 @@ class DetectText:
         for box_idx in range(len(axis_boxes)):
             text = self._get_text(
                 img=img,
-                mask=axis_masks[box_idx],
-                axis_name=axis,
-                plot_type=plot_type
+                mask=axis_masks[box_idx]
             )
             axis_text.append(text)
+
+        expected_type = plot_expected_type_map[plot_type][axis]
+        if expected_type == 'numeric' or 'numeric' in expected_type:
+            axis_text = [try_convert_numeric(x=x) for x in axis_text]
+            numeric_frac = sum([isinstance(x, (int, float)) for x in axis_text]) \
+                / len(axis_text)
+            # if it is numeric or more than half are numeric, assume it is
+            # numeric
+            if expected_type == 'numeric' or numeric_frac > 0.5:
+                # If not numeric, set to null
+                axis_text = [x if isinstance(x, (int, float)) else None for x in axis_text]
+
+                axis_text = self._correct_numeric_sequence(axis=axis_text)
         return axis_text
 
     def _resize_boxes_and_masks(self, img, boxes, masks):
@@ -98,15 +135,15 @@ class DetectText:
         )
         masks = datapoints.Mask(masks, dtype=torch.uint8)
 
-        boxes, masks = transforms.Resize(size=img.shape[1:])(boxes, masks)
+        boxes, masks = transforms.Resize(
+            size=img.shape[1:],
+            antialias=True)(boxes, masks)
         return boxes, masks
 
     def _get_text(
         self,
         img: torch.tensor,
-        mask: torch.tensor,
-        axis_name: str,
-        plot_type: str
+        mask: torch.tensor
     ):
         img = self._rotate_cropped_text(img=img, mask=mask)
 
@@ -133,49 +170,6 @@ class DetectText:
 
         result = pytesseract.image_to_string(img, config='--psm 6')
         result = result.strip()
-
-        def try_convert_numeric(x):
-            if re.match(r'[a-zA-Z]', x):
-                return x
-
-            numeric = re.sub(r'[^0123456789.]', '', x)
-            try:
-                if '.' in numeric:
-                    numeric = float(numeric)
-                else:
-                    numeric = int(numeric)
-            except ValueError:
-                return x
-            return numeric
-
-        plot_expected_type_map = {
-            'vertical_bar': {
-                'x-axis': ['categorical', 'numeric'],
-                'y-axis': 'numeric'
-            },
-            'horizontal_bar': {
-                'x-axis': 'numeric',
-                'y-axis': 'categorical'
-            },
-            'dot': {
-                'x-axis': ['categorical', 'numeric'],
-                'y-axis': ['numeric', None]
-            },
-            'line': {
-                'x-axis': ['categorical', 'numeric'],
-                'y-axis': 'numeric'
-            },
-            'scatter': {
-                'x-axis': 'numeric',
-                'y-axis': 'numeric'
-            }
-
-        }
-
-        expected_type = plot_expected_type_map[plot_type][axis_name]
-        if expected_type == 'numeric' or 'numeric' in expected_type:
-            result = try_convert_numeric(x=result)
-
         return result
 
     @staticmethod
@@ -234,3 +228,74 @@ class DetectText:
 
         rotated_img = img[y:y + h, x:x + w]
         return rotated_img
+
+    @staticmethod
+    def _correct_numeric_sequence(axis: List[Union[int, float, str]]):
+        """tries to correct bad ocr by fixing outlier distance between
+        numbers"""
+        axis = np.array(axis)
+        diff = pd.Series(axis).diff()
+
+        low = diff.quantile(.25)
+        high = diff.quantile(.75)
+        iqr = high - low
+        is_outlier = (diff < low - 1.5 * iqr) | (diff > high + 1.5 * iqr)
+        is_ascending = [True] * len(axis)
+
+        # check if not in ascending order
+        max_ = axis[0]
+        for i, x in enumerate(axis[1:], start=1):
+            if x < max_:
+                is_ascending[i] = False
+            max_ = max(x, max_)
+
+        outlier_idxs = np.where(is_outlier)[0]
+
+        # Either the number before is the outlier or this number is the outlier
+        # i.e. either
+        # 1  10  11
+        # ^^
+
+        # or
+        # 10  100  12
+        #     ^^
+
+        for i, idx in enumerate(outlier_idxs):
+            if i != len(outlier_idxs) - 1 and outlier_idxs[i + 1] == idx + 1:
+                # this number is an outlier (scenario 2)
+                pass
+            else:
+                # the number before is the outlier
+                outlier_idxs[i] = idx - 1
+
+        is_outlier = pd.Series(range(len(axis))).apply(
+            lambda x: x in outlier_idxs or not is_ascending[x] or np.isnan(
+                axis[x]))
+
+        # predict the outlier numbers
+        X = np.array([i for i in range(len(axis)) if not is_outlier[i]])
+        y = axis[~is_outlier]
+        reg = LinearRegression().fit(X.reshape(-1, 1), y)
+
+        for i, x in enumerate(axis):
+            if is_outlier[i]:
+                axis[i] = reg.predict(np.array([i]).reshape(-1, 1))
+
+        return axis.tolist()
+
+
+def try_convert_numeric(x) -> Union[int, float, str]:
+    numeric = re.sub(r'[^0123456789.]', '', x)
+    if len(numeric) == 0:
+        # all non-numeric
+        return x
+
+    if re.match(r'\d', x) is None:
+        # no numbers
+        return x
+
+    if '.' in numeric:
+        numeric = float(numeric)
+    else:
+        numeric = int(numeric)
+    return numeric
