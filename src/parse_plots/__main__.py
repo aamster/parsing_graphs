@@ -54,7 +54,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
         self.logger.info('detecting axes label text')
         tick_labels = self._detect_axes_label_text(
-            axes_segmentations=axes_segmentations)
+            axes_segmentations=axes_segmentations,
+            plot_types=plot_types
+        )
 
         out_path = Path(self.args['out_dir']) / 'submission.csv'
         pd.DataFrame(self._construct_data_series(
@@ -173,11 +175,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     def _detect_axes_label_text(
         self,
-        axes_segmentations: Dict
+        axes_segmentations: Dict,
+        plot_types: Dict[str, str]
     ):
         dt = DetectText(
             axes_segmentations=axes_segmentations,
-            images_dir=Path(self.args['plots_dir']))
+            images_dir=Path(self.args['plots_dir']),
+            plot_types=plot_types
+        )
         return dt.run()
 
     @staticmethod

@@ -20,11 +20,13 @@ class DetectText:
         self,
         axes_segmentations: Dict,
         images_dir: Path,
+        plot_types: Dict[str, str],
         segmentation_resize=(448, 448)
     ):
         self._axes_segmentations = axes_segmentations
         self._images_dir = images_dir
         self._segmentation_resize = segmentation_resize
+        self._plot_types = plot_types
 
     def run(self):
         res = {}
@@ -48,11 +50,20 @@ class DetectText:
                     labels=labels,
                     boxes=boxes,
                     masks=masks,
-                    img=img
+                    img=img,
+                    plot_type=self._plot_types[file_id]
                 ) for axis in ('x-axis', 'y-axis')}
         return res
 
-    def _get_labels_for_axis(self, img, axis, labels, boxes, masks):
+    def _get_labels_for_axis(
+        self,
+        img,
+        axis,
+        labels,
+        boxes,
+        masks,
+        plot_type
+    ):
         def sort_boxes(boxes):
             box_sort_vals = torch.tensor(
                 [box[0].item() if axis == 'x-axis' else -box[3].item() for box
@@ -71,7 +82,9 @@ class DetectText:
         for box_idx in range(len(axis_boxes)):
             text = self._get_text(
                 img=img,
-                mask=axis_masks[box_idx]
+                mask=axis_masks[box_idx],
+                axis_name=axis,
+                plot_type=plot_type
             )
             axis_text.append(text)
         return axis_text
@@ -88,7 +101,13 @@ class DetectText:
         boxes, masks = transforms.Resize(size=img.shape[1:])(boxes, masks)
         return boxes, masks
 
-    def _get_text(self, img: torch.tensor, mask: torch.tensor):
+    def _get_text(
+        self,
+        img: torch.tensor,
+        mask: torch.tensor,
+        axis_name: str,
+        plot_type: str
+    ):
         img = self._rotate_cropped_text(img=img, mask=mask)
 
         def invert_background(img):
@@ -116,32 +135,46 @@ class DetectText:
         result = result.strip()
 
         def try_convert_numeric(x):
+            if re.match(r'[a-zA-Z]', x):
+                return x
+
             numeric = re.sub(r'[^0123456789.]', '', x)
             try:
-                numeric = int(numeric)
-            except ValueError:
-                try:
+                if '.' in numeric:
                     numeric = float(numeric)
-                except ValueError:
-                    return x
+                else:
+                    numeric = int(numeric)
+            except ValueError:
+                return x
             return numeric
 
-        def strip_punctuation(x):
-            if len(x) == 0:
-                return x
-            if not x[0].isalnum() and x[0] != '$':
-                match = re.search(r'\w', x)
-                if match is None:
-                    x = ''
-                else:
-                    x = x[match.start():]
-            if x and not x[-1].isalnum() and x[-1] != '.':
-                x = x[:-1]
-            return x
+        plot_expected_type_map = {
+            'vertical_bar': {
+                'x-axis': ['categorical', 'numeric'],
+                'y-axis': 'numeric'
+            },
+            'horizontal_bar': {
+                'x-axis': 'numeric',
+                'y-axis': 'categorical'
+            },
+            'dot': {
+                'x-axis': ['categorical', 'numeric'],
+                'y-axis': ['numeric', None]
+            },
+            'line': {
+                'x-axis': ['categorical', 'numeric'],
+                'y-axis': 'numeric'
+            },
+            'scatter': {
+                'x-axis': 'numeric',
+                'y-axis': 'numeric'
+            }
 
-        result = try_convert_numeric(x=result)
-        if not isinstance(result, (int, float)):
-            result = strip_punctuation(x=result)
+        }
+
+        expected_type = plot_expected_type_map[plot_type][axis_name]
+        if expected_type == 'numeric' or 'numeric' in expected_type:
+            result = try_convert_numeric(x=result)
 
         return result
 
