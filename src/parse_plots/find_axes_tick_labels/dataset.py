@@ -10,8 +10,14 @@ from torch.utils.data.dataset import T_co
 from torchvision import datapoints, io
 from torchvision.transforms.v2 import functional as F
 
+# 0 indicates background - IMPORTANT !!
+axes_label_map = {
+    'x-axis': 1,
+    'y-axis': 2
+}
 
-class PlotDataset(torch.utils.data.Dataset):
+
+class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         plot_ids: List[str],
@@ -98,12 +104,6 @@ class PlotDataset(torch.utils.data.Dataset):
         """Gets whether axis label is part of x or y axis
         Also modifies tick_labels to exclude any not in axes
         """
-        # 0 indicates background - IMPORTANT !!
-        axes_label_map = {
-            'x-axis': 1,
-            'y-axis': 2
-        }
-
         tick_axis_map = {}
         for axis in axes_label_map:
             ticks = axes[axis]['ticks']

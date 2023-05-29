@@ -24,7 +24,8 @@ dependencies = [
     "mlflow",
     "pycocotools",
     "opencv-python-headless",
-    "boto3"
+    "boto3",
+    "pytesseract"
 ]
 
 [tool.setuptools.packages.find]

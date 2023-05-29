@@ -9,7 +9,7 @@ from torchvision.transforms import transforms
 
 from parse_plots.classify_plot_type.dataset import ClassifyPlotTypeDataset \
     as ClassifyPlotTypesDataset
-from parse_plots.find_axes_tick_labels.dataset import PlotDataset \
+from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset \
     as AxesTickLabelsDataset
 
 
