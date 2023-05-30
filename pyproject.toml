@@ -26,7 +26,8 @@ dependencies = [
     "opencv-python-headless",
     "boto3",
     "pytesseract",
-    "scikit-learn"
+    "scikit-learn",
+    "easyocr"
 ]
 
 [tool.setuptools.packages.find]

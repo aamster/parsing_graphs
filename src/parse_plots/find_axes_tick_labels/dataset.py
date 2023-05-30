@@ -31,7 +31,6 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
                    '3968efe9cbfc', '6ce4bc728dd5', 'd0cf883b1e13']
 
         plot_ids = [x for x in plot_ids if x not in bad_ids]
-        plot_ids = set(plot_ids)
         plot_files = os.listdir(plots_dir)
         self._plot_files = [x for x in plot_files if Path(x).stem in plot_ids]
         self._plots_dir = Path(plots_dir)

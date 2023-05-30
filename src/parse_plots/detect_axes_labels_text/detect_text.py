@@ -47,12 +47,14 @@ class DetectText:
         axes_segmentations: Dict,
         images_dir: Path,
         plot_types: Dict[str, str],
-        segmentation_resize=(448, 448)
+        easyocr_reader,
+        segmentation_resize=(448, 448),
     ):
         self._axes_segmentations = axes_segmentations
         self._images_dir = images_dir
         self._segmentation_resize = segmentation_resize
         self._plot_types = plot_types
+        self._easyocr_reader = easyocr_reader
 
     def run(self):
         res = {}
@@ -90,17 +92,10 @@ class DetectText:
         masks,
         plot_type
     ):
-        def sort_boxes(boxes):
-            box_sort_vals = torch.tensor(
-                [box[0].item() if axis == 'x-axis' else -box[3].item() for box
-                 in boxes])
-            sorted_idx = torch.argsort(box_sort_vals)
-            return sorted_idx
-
         axis_labels = torch.where(labels == axes_label_map[axis])[0]
         axis_boxes = boxes[axis_labels]
 
-        sort_idx = sort_boxes(boxes=axis_boxes)
+        sort_idx = sort_boxes(boxes=axis_boxes, axis=axis)
         axis_boxes = axis_boxes[sort_idx]
         axis_masks = masks[axis_labels][sort_idx]
 
@@ -120,10 +115,16 @@ class DetectText:
             # if it is numeric or more than half are numeric, assume it is
             # numeric
             if expected_type == 'numeric' or numeric_frac > 0.5:
-                # If not numeric, set to null
-                axis_text = [x if isinstance(x, (int, float)) else None for x in axis_text]
+                # protect against all string values
+                if all(isinstance(x, str) for x in axis_text):
+                    pass
+                else:
+                    # If not numeric, set to null
+                    axis_text = [x if isinstance(x, (int, float)) else np.nan for x in axis_text]
 
-                axis_text = self._correct_numeric_sequence(axis=axis_text)
+                    # TODO there's too many edge cases to get thid right.
+                    # maybe better to just finetune ocr model
+                    axis_text = self._correct_numeric_sequence(axis=axis_text)
         return axis_text
 
     def _resize_boxes_and_masks(self, img, boxes, masks):
@@ -150,7 +151,7 @@ class DetectText:
         def invert_background(img):
             """tesseract does poorly when bg is not white.
             inverts img so that the background is white"""
-            return TF.invert(Image.fromarray(img))
+            return np.array(TF.invert(Image.fromarray(img)))
 
         # found by taking small sample of imgs with white bg
         white_bg_mean = 225.19422039776728
@@ -168,7 +169,12 @@ class DetectText:
         #     plt.imshow(img)
         #     plt.show()
 
-        result = pytesseract.image_to_string(img, config='--psm 6')
+        #result = pytesseract.image_to_string(img, config='--psm 6')
+        result = self._easyocr_reader.recognize(img, detail=0)
+        if len(result) == 0:
+            result = ''
+        else:
+            result = result[0]
         result = result.strip()
         return result
 
@@ -231,66 +237,38 @@ class DetectText:
 
     @staticmethod
     def _correct_numeric_sequence(axis: List[Union[int, float, str]]):
-        """tries to correct bad ocr by fixing outlier distance between
-        numbers"""
+        """tries to correct bad ocr
+        1. find most frequent diff
+        2. Assume that numbers should be evenly spaced, create sequence with
+            that diff
+        """
         axis = np.array(axis)
         diff = pd.Series(axis).diff()
+        expected_diff = diff.mode().iloc[0]
 
-        low = diff.quantile(.25)
-        high = diff.quantile(.75)
-        iqr = high - low
-        is_outlier = (diff < low - 1.5 * iqr) | (diff > high + 1.5 * iqr)
-        is_ascending = [True] * len(axis)
-
-        # check if not in ascending order
-        max_ = axis[0]
-        for i, x in enumerate(axis[1:], start=1):
-            if x < max_:
-                is_ascending[i] = False
-            max_ = max(x, max_)
-
-        outlier_idxs = np.where(is_outlier)[0]
-
-        # Either the number before is the outlier or this number is the outlier
-        # i.e. either
-        # 1  10  11
-        # ^^
-
-        # or
-        # 10  100  12
-        #     ^^
-
-        for i, idx in enumerate(outlier_idxs):
-            if i != len(outlier_idxs) - 1 and outlier_idxs[i + 1] == idx + 1:
-                # this number is an outlier (scenario 2)
-                pass
-            else:
-                # the number before is the outlier
-                outlier_idxs[i] = idx - 1
-
-        is_outlier = pd.Series(range(len(axis))).apply(
-            lambda x: x in outlier_idxs or not is_ascending[x] or np.isnan(
-                axis[x]))
-
-        # predict the outlier numbers
-        X = np.array([i for i in range(len(axis)) if not is_outlier[i]])
-        y = axis[~is_outlier]
-        reg = LinearRegression().fit(X.reshape(-1, 1), y)
-
-        for i, x in enumerate(axis):
-            if is_outlier[i]:
-                axis[i] = reg.predict(np.array([i]).reshape(-1, 1))
-
-        return axis.tolist()
+        start = axis[np.where(diff == expected_diff)[0][0]] - expected_diff * \
+                np.where(diff == expected_diff)[0][0]
+        end = axis[np.where(diff == expected_diff)[0][0]] + expected_diff * (
+                    len(axis) - np.where(diff == expected_diff)[0][0])
+        interpolated = np.arange(start, end, expected_diff)
+        if (axis[~np.isnan(axis)].astype('int') == axis[~np.isnan(axis)]).all():
+            interpolated = interpolated.astype('int')
+        return interpolated.tolist()
 
 
 def try_convert_numeric(x) -> Union[int, float, str]:
-    numeric = re.sub(r'[^0123456789.]', '', x)
+    valid_comma = re.search(r',\d{3}', x) is not None
+    if ',' in x and not valid_comma:
+        # assume it is a dot ?
+        x = x.replace(',', '.')
+    numeric = re.sub(r'[^-—0123456789.]', '', x)
+    numeric = re.sub('—', '-', numeric)
+
     if len(numeric) == 0:
         # all non-numeric
         return x
 
-    if re.match(r'\d', x) is None:
+    if re.search(r'\d', x) is None:
         # no numbers
         return x
 
@@ -299,3 +277,11 @@ def try_convert_numeric(x) -> Union[int, float, str]:
     else:
         numeric = int(numeric)
     return numeric
+
+
+def sort_boxes(boxes, axis):
+    box_sort_vals = torch.tensor(
+        [box[0].item() if axis == 'x-axis' else -box[3].item() for box
+         in boxes])
+    sorted_idx = torch.argsort(box_sort_vals)
+    return sorted_idx
