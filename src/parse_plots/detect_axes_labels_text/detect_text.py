@@ -58,9 +58,12 @@ class DetectText:
 
     def run(self):
         res = {}
-        for file_id, pred in tqdm(
-                self._axes_segmentations.items(),
-                total=len(self._axes_segmentations)):
+        if len(self._axes_segmentations) > 1:
+            iterable = tqdm(self._axes_segmentations.items(),
+                            total=len(self._axes_segmentations))
+        else:
+            iterable = self._axes_segmentations.items()
+        for file_id, pred in iterable:
             img = Image.open(f'{self._images_dir / file_id}.jpg')
             img = datapoints.Image(img)
 
