@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 from typing import Dict, List, Union
@@ -173,7 +174,8 @@ class DetectText:
         #     plt.show()
 
         #result = pytesseract.image_to_string(img, config='--psm 6')
-        result = self._easyocr_reader.recognize(img, detail=0)
+        result = self._easyocr_reader.recognize(
+            img, detail=0, batch_size=8, workers=os.cpu_count())
         if len(result) == 0:
             result = ''
         else:
