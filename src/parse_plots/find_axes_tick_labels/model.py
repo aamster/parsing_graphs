@@ -1,10 +1,12 @@
 from contextlib import contextmanager
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 import lightning
 import numpy as np
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
+
+from parse_plots.utils import threshold_soft_masks, convert_masks_to_tensor
 
 
 @contextmanager
@@ -55,14 +57,14 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.log_dict(metrics)
 
         preds = self._get_predictions(batch=batch)
-        target = self._convert_masks_to_tensor(target=target)
+        target = convert_masks_to_tensor(target=target)
         self.train_map.update(preds=preds, target=target)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
         preds = self._get_predictions(batch=batch)
-        target = self._convert_masks_to_tensor(target=target)
+        target = convert_masks_to_tensor(target=target)
         self.val_map.update(preds=preds, target=target)
 
     def predict_step(
@@ -91,17 +93,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
                 data, target = batch
                 preds = self.model(data)
 
-        # threshold soft masks
-        for pred_idx, pred in enumerate(preds):
-            masks = torch.zeros_like(preds[pred_idx]['masks'],
-                                     dtype=torch.uint8)
-            for mask_idx, mask in enumerate(pred['masks']):
-                mask = (mask > 0.5).type(torch.uint8)
-                masks[mask_idx] = mask
-            preds[pred_idx]['masks'] = masks
-            if len(preds[pred_idx]['masks'].shape) == 4:
-                preds[pred_idx]['masks'] = preds[pred_idx]['masks'].squeeze(
-                    dim=1)
+        preds = threshold_soft_masks(preds=preds)
 
         return preds
 
@@ -124,13 +116,6 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
         return optimizer
-
-    @staticmethod
-    def _convert_masks_to_tensor(target):
-        for i in range(len(target)):
-            if type(target[i]['masks']) is not torch.Tensor:
-                target[i]['masks'] = target[i]['masks'].data
-        return target
 
     def _remove_outlier_box_predictions(self, pred: Dict):
         """Sometimes there are stray boxes that are not axes labels.
