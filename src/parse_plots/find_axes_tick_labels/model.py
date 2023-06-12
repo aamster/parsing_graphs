@@ -6,7 +6,7 @@ import numpy as np
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 
-from parse_plots.utils import threshold_soft_masks, convert_masks_to_tensor
+from parse_plots.utils import threshold_soft_masks, convert_to_tensor
 
 
 @contextmanager
@@ -57,14 +57,14 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         self.log_dict(metrics)
 
         preds = self._get_predictions(batch=batch)
-        target = convert_masks_to_tensor(target=target)
+        target = convert_to_tensor(target=target)
         self.train_map.update(preds=preds, target=target)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
         preds = self._get_predictions(batch=batch)
-        target = convert_masks_to_tensor(target=target)
+        target = convert_to_tensor(target=target)
         self.val_map.update(preds=preds, target=target)
 
     def predict_step(

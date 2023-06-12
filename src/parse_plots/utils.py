@@ -58,8 +58,12 @@ def threshold_soft_masks(preds: List[Dict]):
     return preds
 
 
-def convert_masks_to_tensor(target):
+def convert_to_tensor(target):
     for i in range(len(target)):
-        if type(target[i]['masks']) is not torch.Tensor:
-            target[i]['masks'] = target[i]['masks'].data
+        if 'masks' in target[i]:
+            if type(target[i]['masks']) is not torch.Tensor:
+                target[i]['masks'] = target[i]['masks'].data
+        if 'boxes' in target[i]:
+            if type(target[i]['boxes']) is not torch.Tensor:
+                target[i]['boxes'] = target[i]['boxes'].data
     return target
