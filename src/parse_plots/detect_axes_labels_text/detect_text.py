@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from pathlib import Path
@@ -9,6 +10,8 @@ import pandas as pd
 import pytesseract
 import torch
 from PIL import Image
+from easyocr.recognition import get_text
+from easyocr.utils import get_image_list, reformat_input, get_paragraph
 from sklearn.linear_model import LinearRegression
 from torchvision import datapoints
 import torchvision.transforms.v2 as transforms
@@ -16,6 +19,9 @@ import torchvision.transforms.functional as TF
 from tqdm import tqdm
 
 from parse_plots.find_axes_tick_labels.dataset import axes_label_map
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 plot_expected_type_map = {
     'vertical_bar': {
@@ -71,46 +77,41 @@ class DetectText:
             boxes = pred['boxes']
             masks = pred['masks']
             labels = pred['labels']
+
             boxes, masks = self._resize_boxes_and_masks(
                 img=img,
                 boxes=boxes,
                 masks=masks)
 
+            cropped_images = [
+                self._preprocess_cropped_text(img=img, mask=mask)
+                for mask in masks]
+
+            text = self._get_text(imgs=cropped_images)
+            text = np.array(text)
+
+            x_axis_text = text[torch.where(labels == 1)[0]]
+            y_axis_text = text[torch.where(labels == 2)[0]]
+            axis_text = {
+                'x-axis': x_axis_text[sort_boxes(boxes[torch.where(labels == 1)[0]], axis='x-axis')],
+                'y-axis': y_axis_text[sort_boxes(boxes[torch.where(labels == 2)[0]], axis='y-axis')],
+
+            }
+
             res[file_id] = {
-                axis: self._get_labels_for_axis(
+                axis: self._postprocess_text(
                     axis=axis,
-                    labels=labels,
-                    boxes=boxes,
-                    masks=masks,
-                    img=img,
-                    plot_type=self._plot_types[file_id]
+                    plot_type=self._plot_types[file_id],
+                    axis_text=axis_text[axis]
                 ) for axis in ('x-axis', 'y-axis')}
         return res
 
-    def _get_labels_for_axis(
+    def _postprocess_text(
         self,
-        img,
+        axis_text,
         axis,
-        labels,
-        boxes,
-        masks,
         plot_type
     ):
-        axis_labels = torch.where(labels == axes_label_map[axis])[0]
-        axis_boxes = boxes[axis_labels]
-
-        sort_idx = sort_boxes(boxes=axis_boxes, axis=axis)
-        axis_boxes = axis_boxes[sort_idx]
-        axis_masks = masks[axis_labels][sort_idx]
-
-        axis_text = []
-        for box_idx in range(len(axis_boxes)):
-            text = self._get_text(
-                img=img,
-                mask=axis_masks[box_idx]
-            )
-            axis_text.append(text)
-
         expected_type = plot_expected_type_map[plot_type][axis]
         if expected_type == 'numeric' or 'numeric' in expected_type:
             axis_text = [try_convert_numeric(x=x) for x in axis_text]
@@ -126,9 +127,15 @@ class DetectText:
                     # If not numeric, set to null
                     axis_text = [x if isinstance(x, (int, float)) else np.nan for x in axis_text]
 
-                    # TODO there's too many edge cases to get thid right.
+                    # TODO there's too many edge cases to get this right.
                     # maybe better to just finetune ocr model
-                    axis_text = self._correct_numeric_sequence(axis=axis_text)
+                    try:
+                        axis_text = self._correct_numeric_sequence(axis=axis_text)
+                    except Exception as e:
+                        logger.error(e)
+                        axis_text = np.array(axis_text)
+                        axis_text[np.isnan(axis_text)] = 0
+                        axis_text = axis_text.tolist()
         return axis_text
 
     def _resize_boxes_and_masks(self, img, boxes, masks):
@@ -145,11 +152,44 @@ class DetectText:
             antialias=True)(boxes, masks)
         return boxes, masks
 
-    def _get_text(
+    @staticmethod
+    def _get_oriented_bboxes(
+        masks: torch.tensor
+    ):
+        oriented_bboxes = []
+        for mask in masks:
+            mask = mask.numpy().astype('uint8')
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_NONE)
+
+            def find_largest_mask(contours):
+                """sometimes the mask gets split up. take the largest."""
+                largest_idx = None
+                largest_area = -float('inf')
+                for i, contour in enumerate(contours):
+                    x, y, w, h = cv2.boundingRect(contour)
+                    if w * h > largest_area:
+                        largest_idx = i
+                        largest_area = w * h
+                return largest_idx
+
+            if len(contours) == 0:
+                raise RuntimeError('found no contours')
+            elif len(contours) > 1:
+                contour = contours[find_largest_mask(contours=contours)]
+            else:
+                contour = contours[0]
+
+            rect = cv2.minAreaRect(contour)
+            points = cv2.boxPoints(rect)
+            oriented_bboxes.append(points.astype('int'))
+        return oriented_bboxes
+
+    def _preprocess_cropped_text(
         self,
         img: torch.tensor,
         mask: torch.tensor
-    ):
+    ) -> np.array:
         img = self._rotate_cropped_text(img=img, mask=mask)
 
         def invert_background(img):
@@ -169,19 +209,54 @@ class DetectText:
             #         plt.imshow(img)
             #         plt.show()
             img = invert_background(img)
+        return img
 
+    def _get_text(
+        self,
+        imgs: List[np.array]
+    ):
         #     plt.imshow(img)
         #     plt.show()
 
         #result = pytesseract.image_to_string(img, config='--psm 6')
-        result = self._easyocr_reader.recognize(
-            img, detail=0, batch_size=8, workers=os.cpu_count())
-        if len(result) == 0:
-            result = ''
-        else:
-            result = result[0]
-        result = result.strip()
-        return result
+        # TODO recognize gives bad results
+        # manually preprocess, and give it to get_text
+
+        preprocessed_images = []
+        max_widths = []
+        for img in imgs:
+            _, img = reformat_input(img)
+            y_max, x_max = img.shape
+            image_list, max_width = get_image_list(
+                horizontal_list=[[0, x_max, 0, y_max]],
+                free_list=[],
+                img=img
+            )
+            preprocessed_images.append(image_list[0])
+            max_widths.append(max_width)
+
+        results = get_text(
+            character=self._easyocr_reader.character,
+            imgH=64,
+            imgW=int(max(max_widths)),
+            recognizer=self._easyocr_reader.recognizer,
+            converter=self._easyocr_reader.converter,
+            image_list=preprocessed_images,
+            device=self._easyocr_reader.device,
+            batch_size=64,
+            workers=0
+        )
+        results = [item[1] for item in results]
+        # results = self._easyocr_reader.recognize(
+        #     img,
+        #     free_list=oriented_bboxes,
+        #     horizontal_list=[],
+        #     batch_size=64,
+        #     detail=0
+        # )
+        # for i in range(len(results)):
+        #     results[i][1] = results[i][1].strip()
+        return results
 
     @staticmethod
     def _rotate_cropped_text(img: np.ndarray, mask):
@@ -268,6 +343,10 @@ def try_convert_numeric(x) -> Union[int, float, str]:
         x = x.replace(',', '.')
     numeric = re.sub(r'[^-—0123456789.]', '', x)
     numeric = re.sub('—', '-', numeric)
+
+    if '-' in numeric and not numeric.startswith('-'):
+        # invalid - sign
+        numeric = numeric.replace('-', '')
 
     if len(numeric) == 0:
         # all non-numeric
