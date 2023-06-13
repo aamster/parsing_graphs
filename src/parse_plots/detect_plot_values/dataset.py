@@ -2,11 +2,12 @@ import json
 import os
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Optional
 
 import cv2
 import numpy as np
 import torch.utils.data
+from sklearn.cluster import KMeans
 from torch.utils.data.dataset import T_co
 from torchvision import datapoints, io
 from torchvision.utils import draw_keypoints
@@ -18,6 +19,15 @@ from parse_plots.utils import string_to_float
 
 class BadDataError(RuntimeError):
     pass
+
+
+plot_type_id_map = {
+    'dot': 1,
+    'horizontal_bar': 2,
+    'vertical_bar': 3,
+    'line': 4,
+    'scatter': 5
+}
 
 
 class DetectPlotValuesDataset(torch.utils.data.Dataset):
@@ -94,9 +104,9 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
             '58b3a206d02a',
             '2e00ba9ef727',
             '7bdbafd2cb3e',
-            'ed5d7906928c'
+            'ed5d7906928c',
+            'd7f597a3b9c9'
         ]
-
         plot_ids = [x for x in plot_ids if x not in bad_ids]
         plot_files = os.listdir(plots_dir)
         self._plot_files = [x for x in plot_files if Path(x).stem in plot_ids]
@@ -125,22 +135,32 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
                   a['plot-bb']['x0']:a['plot-bb']['x0'] + a['plot-bb'][
                       'width']]
 
-        bboxes = get_targets(img=img, a=a)
+        if a['chart-type'] == 'line':
+            target = get_targets(img=img, a=a)
+            target = {
+                'image_id': id,
+                'mask': target,
+                'plot_bbox': a['plot-bb']
+            }
+            return img, target
+        else:
+            bboxes = get_targets(img=img, a=a)
 
-        labels = torch.tensor([1 for _ in range(len(bboxes))])
+            labels = torch.tensor([
+                plot_type_id_map[a['chart-type']] for _ in range(len(bboxes))])
 
-        if self._transform is not None:
-            img, bboxes, labels = self._transform(
-                img, bboxes, labels)
+            if self._transform is not None:
+                img, bboxes, labels = self._transform(
+                    img, bboxes, labels)
 
-        target = {
-            'image_id': id,
-            'chart_type': a['chart-type'],
-            'boxes': bboxes,
-            'labels': labels
-        }
+            target = {
+                'image_id': id,
+                'chart_type': a['chart-type'],
+                'boxes': bboxes,
+                'labels': labels
+            }
 
-        return img, target
+            return img, target
 
     def __len__(self):
         return len(self._plot_files)
@@ -176,11 +196,44 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
 
 
 def get_targets(img, a: Dict):
-    if a['chart-type'] == 'dot':
+    if a['chart-type'] == 'line':
+        cropped_img = img[:, a['plot-bb']['y0']+10:a['plot-bb']['y0'] + a['plot-bb'][
+            'height']-10,
+              a['plot-bb']['x0']+10:a['plot-bb']['x0'] + a['plot-bb'][
+                  'width']-10]
+        kmeans = KMeans(n_clusters=2, random_state=0, n_init="auto").fit(
+            cropped_img.moveaxis(0, 2).reshape(-1, 3))
+        cropped_mask = kmeans.labels_.reshape(cropped_img.shape[1:])
+        cropped_mask = torch.tensor(cropped_mask, dtype=torch.uint8)
+        zero_count = (kmeans.labels_ == 0).sum()
+        one_count = (kmeans.labels_ == 1).sum()
+        line_label = 1 if one_count < zero_count else 0
+        if line_label == 0:
+            # reverse the labels so mask selects the line
+            cropped_mask_ = torch.zeros_like(cropped_mask)
+            cropped_mask_[cropped_mask == 0] = 1
+            cropped_mask_[cropped_mask == 1] = 0
+            cropped_mask = cropped_mask_
+
+        mask = torch.zeros(*img.shape[1:], dtype=torch.uint8)
+        mask[a['plot-bb']['y0']+10:a['plot-bb']['y0'] + a['plot-bb'][
+            'height']-10, a['plot-bb']['x0']+10:a['plot-bb']['x0'] + a['plot-bb'][
+                  'width']-10] = cropped_mask
+
+        return mask
+    elif a['chart-type'] == 'dot':
         x_pts, y_pts, dot_width, dot_height = get_points(img=img, a=a)
+        bboxes = get_bounding_boxes(
+            img=img,
+            a=a,
+            x_pts=x_pts,
+            y_pts=y_pts,
+            dot_width=dot_width,
+            dot_height=dot_height
+        )
     else:
         x_pts, y_pts = get_points(img=img, a=a)
-    bboxes = get_bounding_boxes(img=img, a=a, x_pts=x_pts, y_pts=y_pts)
+        bboxes = get_bounding_boxes(img=img, a=a, x_pts=x_pts, y_pts=y_pts)
     return bboxes
 
 
@@ -223,12 +276,34 @@ def get_bboxes_for_dot(a: Dict, x_pts, y_pts, dot_width, dot_height):
     return boxes
 
 
-def get_bounding_boxes(img, a, x_pts, y_pts):
+def get_bounding_boxes(img, a, x_pts, y_pts, **kwargs):
     pts = zip([int(x) for x in x_pts], [int(y) for y in y_pts])
     bboxes = []
 
     for i, (x, y) in enumerate(pts):
-        box = np.array([x-1, y-1, x+1, y+1], dtype='float32')
+        if a['chart-type'] == 'vertical_bar':
+            max_y_tick_pos = max(
+                [x['tick_pt']['y'] for x in a['axes']['y-axis']['ticks']])
+            x_diff = a['axes']['x-axis']['ticks'][1]['tick_pt']['x'] - \
+                     a['axes']['x-axis']['ticks'][0]['tick_pt']['x']
+            box = [x - int(x_diff/2), y, x + int(x_diff/2), max_y_tick_pos]
+        elif a['chart-type'] == 'horizontal_bar':
+            min_x_tick_pos = min(
+                [x['tick_pt']['x'] for x in a['axes']['x-axis']['ticks']])
+            y_diff = a['axes']['y-axis']['ticks'][1]['tick_pt']['y'] - \
+                     a['axes']['y-axis']['ticks'][0]['tick_pt']['y']
+            box = [min_x_tick_pos, y - int(y_diff/2), x, y + int(y_diff/2)]
+        elif a['chart-type'] == 'dot':
+            box = [
+                x-int(kwargs['dot_width']/2),
+                y-int(kwargs['dot_height']/2),
+                x+int(kwargs['dot_width']/2),
+                y+int(kwargs['dot_height']/2)
+            ]
+        elif a['chart-type'] == 'scatter':
+            box = [x-8, y-8, x+8, y+8]
+        else:
+            raise NotImplementedError
         bboxes.append(box)
     bboxes = datapoints.BoundingBox(
         np.array(bboxes),
