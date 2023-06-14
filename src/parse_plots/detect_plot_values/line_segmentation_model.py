@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from typing import Dict, Any
 
 import lightning
@@ -25,16 +24,15 @@ class SegmentLinePlotModel(lightning.LightningModule):
 
     def training_step(self, batch, batch_idx):
         data, target = batch
-
         preds = self.model(data)['out']
-        loss = self._criterion(preds, target['mask'].long())
+        self.train_dice.update(preds=preds, target=target['mask'])
+        loss = 1 - self.train_dice.compute()
 
         metrics = {
             'train_loss': loss
         }
         self.log_dict(metrics)
 
-        self.train_dice.update(preds=preds, target=target['mask'])
         return loss
 
     def validation_step(self, batch, batch_idx):
