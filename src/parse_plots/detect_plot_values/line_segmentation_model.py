@@ -2,8 +2,21 @@ from typing import Dict, Any
 
 import lightning
 import torch.nn
-from torch.nn import CrossEntropyLoss
+import torch.nn.functional as F
 from torchmetrics import Dice
+
+
+def dice_loss(pred, target, smooth=1.):
+    pred = pred.contiguous()
+    target = target.contiguous()
+
+    intersection = (pred * target).sum(dim=2).sum(dim=2)
+
+    loss = (1 - ((2. * intersection + smooth) / (
+                pred.sum(dim=2).sum(dim=2) + target.sum(dim=2).sum(
+            dim=2) + smooth)))
+
+    return loss.mean()
 
 
 class SegmentLinePlotModel(lightning.LightningModule):
@@ -20,19 +33,24 @@ class SegmentLinePlotModel(lightning.LightningModule):
         self._hyperparams = hyperparams
         self.train_dice = Dice(ignore_index=0)
         self.val_dice = Dice(ignore_index=0)
-        self._criterion = CrossEntropyLoss()
 
     def training_step(self, batch, batch_idx):
         data, target = batch
+
         preds = self.model(data)['out']
-        self.train_dice.update(preds=preds, target=target['mask'])
-        loss = 1 - self.train_dice.compute()
+        loss, bce, dice = self._calc_loss(
+            pred=preds,
+            target=target['mask']
+        )
 
         metrics = {
-            'train_loss': loss
+            'train_loss': loss,
+            'train_bce_loss': bce,
+            'train_dice_loss': dice
         }
         self.log_dict(metrics)
 
+        self.train_dice.update(preds=preds, target=target['mask'])
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -73,3 +91,17 @@ class SegmentLinePlotModel(lightning.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
         return optimizer
+
+    @staticmethod
+    def _calc_loss(pred, target, ce_weight=0.5):
+        cross_entropy = F.cross_entropy(pred, target.long())
+
+        pred = pred[:, 1]
+        pred = F.sigmoid(pred)
+        pred = pred.unsqueeze(dim=1)
+        target = target.unsqueeze(dim=1)
+        dice = dice_loss(pred, target)
+
+        loss = cross_entropy * ce_weight + dice * (1 - ce_weight)
+
+        return loss, cross_entropy, dice
