@@ -37,28 +37,26 @@ class SegmentLinePlotModel(lightning.LightningModule):
     def training_step(self, batch, batch_idx):
         data, target = batch
 
-        preds = self.model(data)['out']
-        loss, bce, dice = self._calc_loss(
+        preds = self.model(data)
+        loss = self._calc_loss(
             pred=preds,
             target=target['mask']
         )
 
         metrics = {
-            'train_loss': loss,
-            'train_bce_loss': bce,
-            'train_dice_loss': dice
+            'train_dice_loss': loss
         }
         self.log_dict(metrics)
 
-        self.train_dice.update(preds=preds, target=target['mask'])
+        self.train_dice.update(preds=preds.squeeze(), target=target['mask'])
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, target = batch
 
         with torch.no_grad():
-            preds = self.model(data)['out']
-        self.val_dice.update(preds=preds, target=target['mask'])
+            preds = self.model(data)
+        self.val_dice.update(preds=preds.squeeze(), target=target['mask'])
 
     def predict_step(
             self,
@@ -93,15 +91,10 @@ class SegmentLinePlotModel(lightning.LightningModule):
         return optimizer
 
     @staticmethod
-    def _calc_loss(pred, target, ce_weight=0.5):
-        cross_entropy = F.cross_entropy(pred, target.long())
-
-        pred = pred[:, 1]
-        pred = F.sigmoid(pred)
-        pred = pred.unsqueeze(dim=1)
+    def _calc_loss(pred, target):
         target = target.unsqueeze(dim=1)
-        dice = dice_loss(pred, target)
 
-        loss = cross_entropy * ce_weight + dice * (1 - ce_weight)
+        pred = F.sigmoid(pred)
+        loss = dice_loss(pred, target)
 
-        return loss, cross_entropy, dice
+        return loss
