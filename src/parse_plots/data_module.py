@@ -65,7 +65,7 @@ class PlotDataModule(lightning.LightningDataModule):
                 with open(self._ignore_ids_path) as f:
                     ignore_ids = json.load(f)
                 ignore_ids = set(ignore_ids)
-                plot_ids = [x for x in plot_ids if x not in ignore_ids]
+                plot_ids = np.array([x for x in plot_ids if x not in ignore_ids])
 
             idxs = np.arange(len(plot_ids))
             rng = np.random.default_rng(1234)

@@ -136,10 +136,15 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
                       'width']]
 
         if a['chart-type'] == 'line':
-            target = get_targets(img=img, a=a)
+            mask = get_targets(img=img, a=a)
+            mask = datapoints.Mask(mask)
+            if self._transform is not None:
+                img, mask = self._transform(
+                    img, mask)
+
             target = {
                 'image_id': id,
-                'mask': target,
+                'mask': mask,
                 'plot_bbox': a['plot-bb']
             }
             return img, target
