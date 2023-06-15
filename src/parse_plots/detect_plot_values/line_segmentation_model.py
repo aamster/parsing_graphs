@@ -66,7 +66,8 @@ class SegmentLinePlotModel(lightning.LightningModule):
     ):
         data, target = batch
         with torch.no_grad():
-            preds: torch.Tensor = self.model(data)['out']
+            preds: torch.Tensor = self.model(data)
+        preds = F.sigmoid(preds)
         preds = (preds > 0.5).type(torch.uint8)
 
         return preds
