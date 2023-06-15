@@ -23,7 +23,8 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         plot_ids: List[str],
         plots_dir,
         annotations_dir,
-        transform
+        transform,
+        return_axes_tick_text: bool = False
     ):
         super().__init__()
         # these lack labeled ticks
@@ -36,6 +37,7 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         self._plots_dir = Path(plots_dir)
         self._annotations_dir = Path(annotations_dir)
         self._transform = transform
+        self._return_axes_tick_text = return_axes_tick_text
 
     def __getitem__(self, index) -> T_co:
         id = Path(self._plot_files[index]).stem
@@ -67,6 +69,8 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
             'labels': labels,
             'masks': masks
         }
+        if self._return_axes_tick_text:
+            target['axes_tick_text'] = [x['text'] for x in tick_labels]
 
         return img, target
 
