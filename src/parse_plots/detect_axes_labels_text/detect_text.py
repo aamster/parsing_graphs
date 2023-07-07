@@ -7,12 +7,11 @@ from typing import Dict, List, Union
 import cv2
 import numpy as np
 import pandas as pd
-import pytesseract
 import torch
 from PIL import Image
 from easyocr.recognition import get_text
 from easyocr.utils import get_image_list, reformat_input, get_paragraph
-from sklearn.linear_model import LinearRegression
+from scipy import stats
 from torchvision import datapoints
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
@@ -55,7 +54,7 @@ class DetectText:
         images_dir: Path,
         plot_types: Dict[str, str],
         easyocr_reader,
-        segmentation_resize=(448, 448),
+        segmentation_resize=(448, 448)
     ):
         self._axes_segmentations = axes_segmentations
         self._images_dir = images_dir
@@ -106,6 +105,43 @@ class DetectText:
                 ) for axis in ('x-axis', 'y-axis')}
         return res
 
+    def run_inference(self):
+        axes_segmentations = self._axes_segmentations
+        res = {}
+        for file_id, pred in tqdm(axes_segmentations.items()):
+            axis_text = {}
+
+            img = Image.open(f'{self._images_dir / file_id}.jpg')
+            img = datapoints.Image(img)
+
+            img = datapoints.Image(img)
+
+            for axis, axis_pred in pred.items():
+                boxes = axis_pred['boxes']
+                masks = axis_pred['masks']
+
+                boxes, masks = self._resize_boxes_and_masks(
+                    img=img,
+                    boxes=boxes,
+                    masks=masks)
+
+                cropped_images = [
+                    self._preprocess_cropped_text(img=img, mask=mask)
+                    for mask in masks]
+
+                text = self._get_text(imgs=cropped_images)
+                text = np.array(text)
+                axis_text[axis] = text
+            res[file_id] = axis_text
+
+            res[file_id] = {
+                axis: self._postprocess_text(
+                    axis=axis,
+                    plot_type=self._plot_types[file_id],
+                    axis_text=axis_text[axis]
+                ) for axis in ('x-axis', 'y-axis')}
+        return res
+
     def _postprocess_text(
         self,
         axis_text,
@@ -129,13 +165,19 @@ class DetectText:
 
                     # TODO there's too many edge cases to get this right.
                     # maybe better to just finetune ocr model
-                    try:
-                        axis_text = self._correct_numeric_sequence(axis=axis_text)
-                    except Exception as e:
-                        logger.error(e)
-                        axis_text = np.array(axis_text)
-                        axis_text[np.isnan(axis_text)] = 0
-                        axis_text = axis_text.tolist()
+                    # try:
+                    #     axis_text = self._correct_numeric_sequence(axis=axis_text)
+                    # except Exception as e:
+                    #     logger.error(e)
+                    #     axis_text = np.array(axis_text)
+                    #     axis_text[np.isnan(axis_text)] = 0
+                    #     axis_text = axis_text.tolist()
+        if expected_type == 'categorical' or 'categorical' in expected_type:
+            # make sure all string and no numbers
+            types = np.array([type(x) for x in axis_text])
+            mode = stats.mode(types).mode[0]
+            axis_text = [x if isinstance(x, mode) else mode(x)
+                         for x in axis_text]
         return axis_text
 
     def _resize_boxes_and_masks(self, img, boxes, masks):
@@ -259,26 +301,55 @@ class DetectText:
         return results
 
     @staticmethod
-    def _rotate_cropped_text(img: np.ndarray, mask):
+    def _rotate_cropped_text(img: torch.Tensor, mask):
+        center, size, angle = DetectText.get_min_area_rect(mask=mask)
+        #     plt.imshow(mask, cmap='gray')
+        #     plt.show()
+
+        mask = TF.rotate(mask.unsqueeze(dim=0), angle - 90, expand=True)
+        mask = mask.moveaxis(0, 2).numpy()
+        #     plt.imshow(mask, cmap='gray')
+        #     plt.show()
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_NONE)
+
+        if len(contours) > 1:
+            contour = contours[DetectText.find_largest_mask(contours=contours)]
+        else:
+            contour = contours[0]
+
+        x, y, w, h = cv2.boundingRect(contour)
+
+        img = TF.rotate(Image.fromarray(img.moveaxis(0, 2).numpy()), angle - 90,
+                        interpolation=transforms.InterpolationMode.BICUBIC,
+                        expand=True)
+
+        img = np.array(img)
+        rotated_img = img[y:y + h, x:x + w]
+        return rotated_img
+
+    @staticmethod
+    def find_largest_mask(contours):
+        """sometimes the mask gets split up. take the largest."""
+        largest_idx = None
+        largest_area = -float('inf')
+        for i, contour in enumerate(contours):
+            x, y, w, h = cv2.boundingRect(contour)
+            if w * h > largest_area:
+                largest_idx = i
+                largest_area = w * h
+        return largest_idx
+
+    @staticmethod
+    def get_min_area_rect(mask: torch.Tensor):
         mask = mask.numpy().astype('uint8')
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_NONE)
 
-        def find_largest_mask(contours):
-            """sometimes the mask gets split up. take the largest."""
-            largest_idx = None
-            largest_area = -float('inf')
-            for i, contour in enumerate(contours):
-                x, y, w, h = cv2.boundingRect(contour)
-                if w * h > largest_area:
-                    largest_idx = i
-                    largest_area = w * h
-            return largest_idx
-
         if len(contours) == 0:
             raise RuntimeError('found no contours')
         elif len(contours) > 1:
-            contour = contours[find_largest_mask(contours=contours)]
+            contour = contours[DetectText.find_largest_mask(contours=contours)]
         else:
             contour = contours[0]
 
@@ -288,32 +359,7 @@ class DetectText:
         if h > 2 * w and angle == 90:
             # probably vertical text and angle should be 0
             angle = 0
-
-        #     plt.imshow(mask, cmap='gray')
-        #     plt.show()
-
-        mask = TF.rotate(Image.fromarray(mask), angle - 90, expand=True)
-        mask = np.array(mask)
-        #     plt.imshow(mask, cmap='gray')
-        #     plt.show()
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_NONE)
-
-        if len(contours) > 1:
-            contour = contours[find_largest_mask(contours=contours)]
-        else:
-            contour = contours[0]
-
-        x, y, w, h = cv2.boundingRect(contour)
-
-        img = Image.fromarray(img.moveaxis(0, 2).numpy())
-        img = TF.rotate(img, angle - 90,
-                        interpolation=transforms.InterpolationMode.BICUBIC,
-                        expand=True)
-        img = np.array(img)
-
-        rotated_img = img[y:y + h, x:x + w]
-        return rotated_img
+        return center, size, angle
 
     @staticmethod
     def _correct_numeric_sequence(axis: List[Union[int, float, str]]):

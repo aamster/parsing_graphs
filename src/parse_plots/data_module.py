@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional, Union, Type, Callable
+from typing import Optional, Union, Type, Callable, List
 
 import lightning
 import numpy as np
@@ -11,8 +11,7 @@ from torchvision.transforms import transforms
 from parse_plots.classify_plot_type.dataset import ClassifyPlotTypeDataset \
     as ClassifyPlotTypesDataset
 from parse_plots.detect_plot_values.dataset import DetectPlotValuesDataset
-from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset \
-    as AxesTickLabelsDataset
+from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset
 
 
 class PlotDataModule(lightning.LightningDataModule):
@@ -20,19 +19,21 @@ class PlotDataModule(lightning.LightningDataModule):
         self,
         batch_size: int,
         num_workers: int,
-        plots_dir,
-        annotations_dir,
+        plots_dir: Path,
         dataset_class: Union[
             Type[ClassifyPlotTypesDataset],
-            Type[AxesTickLabelsDataset],
+            Type[FindAxesTickLabelsDataset],
             Type[DetectPlotValuesDataset]
         ],
-        file_id_chart_type_map_path: Path,
+        file_id_chart_type_map_path: Optional[Path] = None,
+        annotations_dir: Optional[Path] = None,
         train_transform: Optional[transforms.Compose] = None,
         inference_transform: Optional[transforms.Compose] = None,
         collate_func: Optional[Callable] = None,
         ignore_ids_path: Optional[Path] = None,
-        plot_types=('vertical_bar', 'horizontal_bar', 'dot', 'scatter', 'line')
+        plot_ids: Optional[List] = None,
+        plot_types=('vertical_bar', 'horizontal_bar', 'dot', 'scatter', 'line'),
+        **kwargs
     ):
         super().__init__()
         self._batch_size = batch_size
@@ -48,6 +49,12 @@ class PlotDataModule(lightning.LightningDataModule):
         self._file_id_chart_type_map_path = file_id_chart_type_map_path
         self._plot_types = plot_types
         self._ignore_ids_path = ignore_ids_path
+        self._plot_ids = plot_ids
+        self._is_train = kwargs.get('is_train', True)
+        self._kwargs = kwargs
+
+        if self._is_train and annotations_dir is None:
+            raise ValueError('annotations_dir must be given if train')
 
     def setup(self, stage: str):
         if stage == "fit":
@@ -57,9 +64,10 @@ class PlotDataModule(lightning.LightningDataModule):
             with open(self._file_id_chart_type_map_path) as f:
                 file_id_chart_type_map = json.load(f)
 
-            plot_ids = np.array([
-                x for x in plot_ids
-                if file_id_chart_type_map[x] in self._plot_types])
+            if self._is_train:
+                plot_ids = np.array([
+                    x for x in plot_ids
+                    if file_id_chart_type_map[x] in self._plot_types])
 
             if self._ignore_ids_path is not None:
                 with open(self._ignore_ids_path) as f:
@@ -84,6 +92,16 @@ class PlotDataModule(lightning.LightningDataModule):
                 annotations_dir=self._annotations_dir,
                 plot_ids=plot_ids[val_idxs],
                 transform=self._test_transform
+            )
+        elif stage == 'predict':
+            if self._plot_ids is None:
+                raise ValueError('If predict, must provide plot ids')
+            self._val = self._dataset_class(
+                plots_dir=self._plots_dir,
+                annotations_dir=self._annotations_dir,
+                plot_ids=self._plot_ids,
+                transform=self._test_transform,
+                **self._kwargs
             )
 
     def train_dataloader(self):

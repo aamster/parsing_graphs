@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import cv2
 import numpy as np
@@ -22,9 +22,10 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         self,
         plot_ids: List[str],
         plots_dir,
-        annotations_dir,
         transform,
-        return_axes_tick_text: bool = False
+        annotations_dir: Optional[Path] = None,
+        return_axes_tick_text: bool = False,
+        is_train: bool = True
     ):
         super().__init__()
         # these lack labeled ticks
@@ -35,14 +36,21 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         plot_files = os.listdir(plots_dir)
         self._plot_files = [x for x in plot_files if Path(x).stem in plot_ids]
         self._plots_dir = Path(plots_dir)
-        self._annotations_dir = Path(annotations_dir)
+        self._annotations_dir = Path(annotations_dir) \
+            if annotations_dir is not None else None
         self._transform = transform
         self._return_axes_tick_text = return_axes_tick_text
+        self._is_train = is_train
 
     def __getitem__(self, index) -> T_co:
         id = Path(self._plot_files[index]).stem
         img = io.read_image(str(self._plots_dir / f'{id}.jpg'))
         img = datapoints.Image(img)
+
+        if not self._is_train:
+            if self._transform is not None:
+                img = self._transform(img)
+            return img, {'image_id': id}
 
         with open(self._annotations_dir / f'{id}.json') as f:
             a = json.load(f)

@@ -2,7 +2,11 @@ import re
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from torchvision import datapoints
+from torchvision.transforms import v2 as T
+from torchvision.transforms.v2 import functional as F
 from torchvision.utils import draw_segmentation_masks, draw_bounding_boxes
 
 
@@ -67,3 +71,31 @@ def convert_to_tensor(target):
             if type(target[i]['boxes']) is not torch.Tensor:
                 target[i]['boxes'] = target[i]['boxes'].data
     return target
+
+
+def resize_plot_bounding_box(
+    img: torch.tensor,
+    plot_bounding_box: Dict
+):
+    """Plot bounding box for inference obtained using a 448x448 image
+    Resize to original image size"""
+    bboxes = torch.tensor([
+        [plot_bounding_box['x0'],
+         plot_bounding_box['y0'],
+         plot_bounding_box['x0'] + plot_bounding_box['width'],
+         plot_bounding_box['y0'] + plot_bounding_box['height']]
+    ])
+    bboxes = datapoints.BoundingBox(
+        bboxes,
+        format=datapoints.BoundingBoxFormat.XYXY,
+        spatial_size=(448, 448)
+    )
+    bboxes = T.Resize(F.get_spatial_size(img))(bboxes)
+    bbox = bboxes[0]
+    x0, y0, x1, y1 = bbox.int().numpy()
+    return {
+        'x0': x0,
+        'y0': y0,
+        'width': x1 - x0,
+        'height': y1 - y0
+    }

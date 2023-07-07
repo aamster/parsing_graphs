@@ -1,26 +1,37 @@
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple, List, Any, Optional
 
 import argschema as argschema
+import cv2
+import easyocr
 import numpy as np
 import pandas as pd
 import torch
 import torchvision
-from lightning import Trainer
+from backboned_unet import Unet
+from lightning import Trainer, LightningModule
+from torchvision.models.segmentation import FCN_ResNet50_Weights
+
+from parse_plots.data_module import PlotDataModule
+from parse_plots.detect_plot_values.dataset import DetectPlotValuesDataset
+from parse_plots.detect_plot_values.line_segmentation_model import \
+    SegmentLinePlotModel
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.models import efficientnet_b1
 import torchvision.transforms.v2 as T
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_V2_Weights, \
     maskrcnn_resnet50_fpn_v2
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, \
+    fasterrcnn_resnet50_fpn_v2
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from torchvision.transforms import InterpolationMode
 
 from parse_plots.classify_plot_type.dataset import ClassifyPlotTypeDataset
 from parse_plots.classify_plot_type.model import ClassifyPlotTypeModel
 from parse_plots.detect_axes_labels_text.detect_text import DetectText
+from parse_plots.detect_plot_values.model import DetectPlotValuesModel
 from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset
 from parse_plots.find_axes_tick_labels.model import SegmentAxesTickLabelsModel
 
@@ -29,9 +40,12 @@ torchvision.disable_beta_transforms_warning()
 
 class ParsePlotsSchema(argschema.ArgSchema):
     plots_dir = argschema.fields.InputDir(required=True)
-    annotations_dir = argschema.fields.InputDir(required=True)
     classify_plot_type_checkpoint = argschema.fields.InputFile(required=True)
     segment_axes_tick_labels_checkpoint = argschema.fields.InputFile(required=True)
+    ocr_model_storage_directory = argschema.fields.InputDir(required=True)
+    ocr_user_network_directory = argschema.fields.InputDir(required=True)
+    line_plot_segmentation_checkpoint = argschema.fields.InputFile(required=True)
+    plot_object_detector_checkpoint = argschema.fields.InputFile(required=True)
     out_dir = argschema.fields.OutputDir(required=True)
     is_debug = argschema.fields.Boolean(default=False)
 
@@ -44,29 +58,384 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             schema_type=ParsePlotsSchema
         )
         plot_files = os.listdir(self.args['plots_dir'])
-        self._plot_ids = [Path(x).stem for x in plot_files]
+        plot_ids = [Path(x).stem for x in plot_files]
+        if self.args['is_debug']:
+            plot_ids = plot_ids[:16]
+        self._plot_ids = plot_ids
+        self._is_debug = self.args['is_debug']
+        self._segment_line_plot_model = \
+            SegmentLinePlotModel.load_from_checkpoint(
+                checkpoint_path=self.args['line_plot_segmentation_checkpoint'],
+                learning_rate=1e-3,
+                model=Unet(classes=1),
+                hyperparams={}
+            )
+        self._detect_plot_values_model = \
+            DetectPlotValuesModel.load_from_checkpoint(
+                checkpoint_path=self.args['plot_object_detector_checkpoint'],
+                learning_rate=1e-3,
+                model=self.detect_plot_values_model,
+                hyperparams={}
+            )
+
+    @property
+    def detect_plot_values_model(self):
+        model = fasterrcnn_resnet50_fpn_v2()
+
+        # replace box classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 6)
+        return model
 
     def run(self):
-        self.logger.info('Classifying plot type')
-        plot_types = self._classify_plot_type()
 
-        self.logger.info('segmenting axes labels')
-        axes_segmentations = self._find_axes_tick_labels()
+        all_data_series = []
+        for axes_segmentations in self._find_axes_tick_labels():
+            plot_types = self._classify_plot_type(
+                axes_segmentations=axes_segmentations
+            )
 
-        self.logger.info('detecting axes label text')
-        tick_labels = self._detect_axes_label_text(
-            axes_segmentations=axes_segmentations,
-            plot_types=plot_types
-        )
+            tick_labels = self. _detect_axes_label_text(
+                axes_segmentations=axes_segmentations,
+                plot_types=plot_types
+            )
+            plot_values = self._detect_plot_values(
+                axes_segmentations=axes_segmentations,
+                plot_types=plot_types,
+                tick_labels=tick_labels
+            )
+            file_id_plot_values_map = {}
+            for file_id, plot_points in plot_values.items():
+                # add string values
+                plot_points_ = []
+                for i in range(len(plot_points)):
+                    plot_point = [plot_points[i][0], plot_points[i][1]]
+                    if plot_point[0] is None:
+                        plot_point[0] = tick_labels[file_id]['x-axis'][i]
+                    if plot_point[1] is None:
+                        plot_point[1] = tick_labels[file_id]['y-axis'][i]
+                    plot_points_.append(tuple(plot_point))
+                file_id_plot_values_map[file_id] = plot_points_
+            data_series = self._construct_data_series(
+                plot_types=plot_types,
+                file_id_plot_values_map=file_id_plot_values_map
+            )
+            data_series = pd.DataFrame(data_series)
+            all_data_series.append(data_series)
 
         out_path = Path(self.args['out_dir']) / 'submission.csv'
-        pd.DataFrame(self._construct_data_series(
-            plot_types=plot_types,
-            tick_labels=tick_labels
-        )).to_csv(out_path, index=False)
+        pd.concat(all_data_series).to_csv(out_path, index=False)
         self.logger.info(f'Wrote submission to {out_path}')
 
-    def _classify_plot_type(self):
+    def _detect_plot_values(
+        self,
+        axes_segmentations: Dict[str, Dict],
+        plot_types: Dict[str, str],
+        tick_labels
+    ):
+        plot_values_img_coordinates = []
+        line_plot_ids = [x for x in axes_segmentations
+                         if plot_types[x] == 'line']
+        if line_plot_ids:
+            line_masks = self._detect_plot_values_with_model(
+                plot_ids=line_plot_ids,
+                plot_types=plot_types,
+                model=self._segment_line_plot_model,
+                axes_segmentations=axes_segmentations
+            )
+            for i, plot_id in enumerate(line_plot_ids):
+                plot_values_img_coordinates.append((
+                    plot_id,
+                    self._get_line_plot_values_in_img_coordinates(
+                        axes_segmentations=axes_segmentations[plot_id],
+                        line_plot_mask=line_masks[0][i]
+                    )
+                ))
+
+        other_plot_ids = [x for x in axes_segmentations
+                          if plot_types[x] != 'line']
+        if other_plot_ids:
+            predictions = self._detect_plot_values_with_model(
+                plot_ids=other_plot_ids,
+                plot_types=plot_types,
+                model=self._detect_plot_values_model,
+                axes_segmentations=axes_segmentations
+            )
+            predictions = predictions[0]
+            for i, plot_id in enumerate(other_plot_ids):
+                plot_values_img_coordinates.append((
+                    plot_id,
+                    self._get_plot_values_in_img_coordinates(
+                        boxes=predictions[i]['boxes'],
+                        plot_type=plot_types[plot_id]
+                    )
+                ))
+
+        file_id_plot_points_map = {}
+        for file_id, img_coordinates in plot_values_img_coordinates:
+            axes = self._get_tick_points(
+                axes_segmentations=axes_segmentations[file_id]
+            )
+
+            if plot_types[file_id] == 'dot':
+                tick_dot_count = {i: 0 for i in range(len(axes['x-axis']))}
+                for x, y in img_coordinates:
+                    dists = [abs(x - tick_pt['tick_pt'])
+                             for tick_pt in axes['x-axis']]
+                    min_dist = np.argmin(dists)
+                    tick_dot_count[axes['x-axis'][min_dist]['tick_id']] += 1
+                x_axis_tick_ids = [x['tick_id'] for x in axes['x-axis']]
+                file_id_plot_points_map[file_id] = list(zip(
+                    tick_labels[file_id]['x-axis'],
+                    [tick_dot_count[x]for x in x_axis_tick_ids]
+                ))
+
+            else:
+                plot_points = []
+                for coord in img_coordinates:
+                    plot_point_values = []
+                    for axis, axis_idx in [('x', 0), ('y', 1)]:
+                        closest_tick_label_idx = \
+                            self._get_closest_tick_label_in_image_coordinates(
+                                coord=coord,
+                                axis=axis,
+                                axes_segmentations=axes_segmentations[file_id][f'{axis}-axis']
+                            )
+                        closest_tick_pt = axes[f'{axis}-axis'][closest_tick_label_idx]
+                        closest_tick_val = (
+                            tick_labels[file_id][f'{axis}-axis']
+                            [closest_tick_label_idx])
+
+                        if isinstance(closest_tick_val, str):
+                            plot_point_values.append(None)
+                        else:
+                            axis_spacing = abs(
+                                axes[f'{axis}-axis'][1]['tick_pt'] -
+                                axes[f'{axis}-axis'][0]['tick_pt'])
+                            axis_diff = abs(
+                                tick_labels[file_id][f'{axis}-axis'][0] -
+                                tick_labels[file_id][f'{axis}-axis'][1])
+                            diff_from_closest_tick_val = \
+                                abs(closest_tick_pt['tick_pt'] -
+                                    coord[axis_idx]) / axis_spacing * axis_diff
+
+                            if axis == 'y':
+                                # coordinates increase but values decrease
+                                if (coord[axis_idx] >
+                                        closest_tick_pt['tick_pt']):
+                                    plot_val = (closest_tick_val -
+                                                diff_from_closest_tick_val)
+                                else:
+                                    plot_val = (closest_tick_val +
+                                                diff_from_closest_tick_val)
+                            else:
+                                # coordinates increase and values increase
+                                if (coord[axis_idx] >
+                                        closest_tick_pt['tick_pt']):
+                                    plot_val = (closest_tick_val +
+                                                diff_from_closest_tick_val)
+                                else:
+                                    plot_val = (closest_tick_val -
+                                                diff_from_closest_tick_val)
+                            plot_point_values.append(plot_val)
+                    plot_points.append(plot_point_values)
+                file_id_plot_points_map[file_id] = plot_points
+        return file_id_plot_points_map
+
+    @staticmethod
+    def _get_closest_tick_label_in_image_coordinates(
+            coord: Tuple[int, int],
+            axis: str,
+            axes_segmentations: Dict
+    ) -> torch.Tensor:
+        axes_boxes = axes_segmentations['boxes']
+
+        if axis == 'y':
+            tick_label_coords = torch.tensor([
+                (x[1] + x[3]) / 2 for x in axes_boxes])
+            dist = (tick_label_coords - coord[1]).abs()
+        else:
+            tick_label_coords = torch.tensor([
+                (x[0] + x[2]) / 2 for x in axes_boxes])
+            dist = (tick_label_coords - coord[0]).abs()
+
+        return dist.argsort()[0].item()
+
+    @staticmethod
+    def _get_plot_values_in_img_coordinates(
+        boxes: torch.Tensor,
+        plot_type
+    ):
+        plot_vals = []
+        boxes = boxes.numpy()
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            if plot_type == 'vertical_bar':
+                plot_vals.append(((x1 + x2) / 2, y1))
+            elif plot_type == 'horizontal_bar':
+                plot_vals.append((x2, (y1 + y2) / 2))
+            elif plot_type in ('scatter', 'dot'):
+                plot_vals.append(((x2 + x1) / 2, (y2 + y1) / 2))
+        return plot_vals
+
+    @staticmethod
+    def _get_line_plot_values_in_img_coordinates(
+        axes_segmentations,
+        line_plot_mask: torch.Tensor
+    ):
+        # resizing since segmentation model trained with 256x256, and
+        # axes segmentation model trained with 448x448
+        line_plot_mask = T.Resize([448, 448])(line_plot_mask)
+        line_plot_mask = line_plot_mask.squeeze()
+
+        plot_vals = []
+        for mask in axes_segmentations['x-axis']['masks']:
+            rect = DetectText.get_min_area_rect(mask=mask)
+            box_points = cv2.boxPoints(rect)
+
+            angle = rect[-1]
+
+            if abs(angle - 90) / 90 < .05 or abs(angle) < .05:
+                # not a rotated tick label
+                x_val = int((box_points[2][0] + box_points[3][0]) / 2)
+            else:
+                # rotated tick label
+                midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
+                x_val = int(box_points[1][0] + midpoint)
+            if (line_plot_mask[:, x_val] == 0).all():
+                # mask is missing here. find nearest point
+                mask_vals = torch.where(line_plot_mask)
+                x_val = (mask_vals[1][(mask_vals[1] - x_val).abs()
+                         .argsort()[0]]
+                         .item())
+            y_val = (torch.argwhere(line_plot_mask[:, x_val])
+                     .type(torch.float)
+                     .mean()
+                     .type(torch.int)
+                     .item()
+                     )
+            plot_vals.append((x_val, y_val))
+        return plot_vals
+
+    @staticmethod
+    def _get_tick_points(
+        axes_segmentations
+    ):
+        axes = {
+            'x-axis': [],
+            'y-axis': []
+        }
+        tick_id = 0
+        for axis in axes_segmentations:
+            for mask in axes_segmentations[axis]['masks']:
+                rect = DetectText.get_min_area_rect(mask=mask)
+                box_points = cv2.boxPoints(rect)
+
+                angle = rect[-1]
+
+                if abs(angle - 90) / 90 < .05 or abs(angle) < .05:
+                    # not a rotated tick label
+                    center = rect[0]
+                    if axis == 'x-axis':
+                        tick_pt = center[0]
+                    else:
+                        tick_pt = center[1]
+                else:
+                    # rotated tick label
+                    midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
+                    tick_pt = box_points[1][0] + midpoint
+
+                axes[axis].append({
+                    'tick_id': tick_id,
+                    'tick_pt': tick_pt
+                })
+                tick_id += 1
+        return axes
+
+    def _detect_plot_values_with_model(
+            self,
+            plot_types,
+            plot_ids,
+            model: LightningModule,
+            axes_segmentations: Dict
+    ):
+        # the bounding box containing just the plot
+        plots_bounding_box = self._get_plot_bounding_boxes(
+            axes_segmentations=axes_segmentations
+        )
+        data_module_kwargs = {
+            'is_train': False,
+            'plot_meta': plots_bounding_box
+        }
+
+        if isinstance(model, DetectPlotValuesModel):
+
+            transform = T.Compose([
+                T.ToImageTensor(),
+                T.ConvertImageDtype(torch.float32),
+                T.Resize([448, 448])
+            ])
+        else:
+            transform = T.Compose([
+                T.ToImageTensor(),
+                T.ConvertImageDtype(torch.float32),
+                T.Resize([256, 256]),
+                T.Normalize(
+                    mean=FCN_ResNet50_Weights.DEFAULT.transforms().mean,
+                    std=FCN_ResNet50_Weights.DEFAULT.transforms().std)
+            ])
+
+        def collate_func(batch):
+            return tuple(zip(*batch))
+        collate_func = collate_func if \
+            isinstance(model, DetectPlotValuesModel) else None
+
+        data_module = PlotDataModule(
+            plots_dir=self.args['plots_dir'],
+            batch_size=8,
+            dataset_class=DetectPlotValuesDataset,
+            num_workers=0 if self._is_debug else os.cpu_count(),
+            file_id_chart_type_map_path=plot_types,
+            plot_ids=plot_ids,
+            inference_transform=transform,
+            collate_func=collate_func,
+            **data_module_kwargs
+        )
+        trainer = Trainer()
+        predictions = trainer.predict(
+            model=model,
+            datamodule=data_module
+        )
+        return predictions
+
+    @staticmethod
+    def _get_plot_bounding_boxes(axes_segmentations: Dict) -> Dict:
+        bounding_boxes = {}
+        for file_id in axes_segmentations:
+            x_axis_segmentations = axes_segmentations[file_id]['x-axis']
+            y_axis_segmentations = axes_segmentations[file_id]['y-axis']
+
+            x0 = (x_axis_segmentations['boxes'][0][0] +
+                  x_axis_segmentations['boxes'][0][2]) / 2
+            y0 = (y_axis_segmentations['boxes'][-1][1] +
+                  y_axis_segmentations['boxes'][-1][3]) / 2
+            x1 = x_axis_segmentations['boxes'][-1][2]
+            y1 = (y_axis_segmentations['boxes'][0][3] +
+                  y_axis_segmentations['boxes'][0][1]) / 2
+
+            height = y1 - y0
+            width = x1 - x0
+            bounding_boxes[file_id] = {
+                'plot_bbox': {
+                    'x0': int(x0.item()),
+                    'y0': int(y0.item()),
+                    'width': int(width.item()),
+                    'height': int(height.item())
+                }
+            }
+        return bounding_boxes
+
+    def _classify_plot_type(self, axes_segmentations: Dict) -> Dict[str, str]:
         transforms = T.Compose([
             T.ToImageTensor(),
             T.ConvertImageDtype(torch.float32),
@@ -80,15 +449,21 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 mean=[0.485, 0.456, 0.406],
                 std=[0.229, 0.224, 0.225])
         ])
+
+        bounding_boxes = self._get_plot_bounding_boxes(
+            axes_segmentations=axes_segmentations
+        )
+        plot_ids = list(axes_segmentations.keys())
         dataset = ClassifyPlotTypeDataset(
-            annotations_dir=self.args['annotations_dir'],
             plots_dir=self.args['plots_dir'],
-            plot_ids=self._plot_ids,
-            transform=transforms
+            plot_ids=plot_ids,
+            transform=transforms,
+            plot_meta=bounding_boxes,
+            is_train=False
         )
         data_loader = DataLoader(
             dataset=dataset,
-            batch_size=1 if self.args['is_debug'] else 64,
+            batch_size=8 if self.args['is_debug'] else 64,
             num_workers=os.cpu_count(),
             shuffle=False
         )
@@ -107,40 +482,19 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 hyperparams={},
                 map_location=(torch.device('cpu') if not torch.has_cuda
                               else None)
-        )
+            )
 
-        trainer = Trainer(
-            limit_predict_batches=2 if self.args['is_debug'] else None)
+        trainer = Trainer()
         predictions = trainer.predict(
             model=model,
             dataloaders=data_loader
         )
         predictions = np.concatenate(predictions)
 
-        predictions = dict(zip(self._plot_ids, predictions))
+        predictions = dict(zip(plot_ids, predictions))
         return predictions
 
-    def _find_axes_tick_labels(self):
-        transforms = T.Compose([
-            T.ToImageTensor(),
-            T.ConvertImageDtype(torch.float32),
-            T.Resize([448, 448], antialias=True),
-            T.SanitizeBoundingBox(labels_getter=lambda inputs: inputs[3])
-        ])
-
-        dataset = FindAxesTickLabelsDataset(
-            annotations_dir=self.args['annotations_dir'],
-            plots_dir=self.args['plots_dir'],
-            plot_ids=self._plot_ids,
-            transform=transforms
-        )
-        data_loader = DataLoader(
-            dataset=dataset,
-            batch_size=1 if self.args['is_debug'] else 64,
-            num_workers=0 if self.args['is_debug'] else os.cpu_count(),
-            shuffle=False
-        )
-
+    def _find_axes_tick_labels(self) -> Dict:
         weights = MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
         model = maskrcnn_resnet50_fpn_v2(weights=weights)
 
@@ -164,45 +518,64 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 map_location=(torch.device('cpu') if not torch.has_cuda
                               else None)
         )
-        trainer = Trainer(
-            limit_predict_batches=2 if self.args['is_debug'] else None
-        )
-        predictions = trainer.predict(model=model, dataloaders=data_loader)
-        predictions = np.concatenate(predictions)
 
-        res = {}
-        for i in range(len(predictions)):
-            res[self._plot_ids[i]] = predictions[i]
+        batch_size = 8
+        for start in torch.arange(0, len(self._plot_ids), batch_size):
+            data_module = PlotDataModule(
+                plots_dir=self.args['plots_dir'],
+                batch_size=8,
+                dataset_class=FindAxesTickLabelsDataset,
+                num_workers=0 if self._is_debug else os.cpu_count(),
+                plot_ids=self._plot_ids[start:start+batch_size],
+                inference_transform=T.Compose([
+                    T.ToImageTensor(),
+                    T.ConvertImageDtype(torch.float32),
+                    T.Resize([448, 448], antialias=True)
+                ]),
+                is_train=False
+            )
+            trainer = Trainer()
 
-        return res
+            predictions = trainer.predict(
+                model=model,
+                datamodule=data_module
+            )
+
+            yield predictions[0]
 
     def _detect_axes_label_text(
         self,
         axes_segmentations: Dict,
         plot_types: Dict[str, str]
     ):
+        reader = easyocr.Reader(
+            lang_list=['en'],
+            recog_network='ocr_model',
+            user_network_directory=self.args['ocr_user_network_directory'],
+            model_storage_directory=self.args['ocr_model_storage_directory'],
+            gpu=torch.cuda.is_available()
+        )
         dt = DetectText(
             axes_segmentations=axes_segmentations,
             images_dir=Path(self.args['plots_dir']),
-            plot_types=plot_types
+            plot_types=plot_types,
+            easyocr_reader=reader
         )
-        return dt.run()
+        return dt.run_inference()
 
     @staticmethod
     def _construct_data_series(
             plot_types: Dict[str, str],
-            tick_labels):
+            file_id_plot_values_map: Dict[str, List[Tuple[Any, Any]]]):
         res = []
-        for file_id, plot_type in plot_types.items():
-            for axis, axis_labels in tick_labels[file_id].items():
-                axis = 'x' if axis == 'x-axis' else 'y'
-                if axis == 'x':     # TODO remove when y axis values complete
-                    data_series = ';'.join([str(x) for x in axis_labels])
-                    res.append({
-                        'id': f'{file_id}_{axis}',
-                        'data_series': data_series,
-                        'chart_type': plot_type
-                    })
+        for file_id, plot_values in file_id_plot_values_map.items():
+            for axis, axis_idx in [('x', 0), ('y', 1)]:
+                data_series = ';'.join([str(x[axis_idx]) for x in plot_values])
+                res.append({
+                    'id': f'{file_id}_{axis}',
+                    'data_series': data_series,
+                    'chart_type': plot_types[file_id]
+                })
         return res
 
 

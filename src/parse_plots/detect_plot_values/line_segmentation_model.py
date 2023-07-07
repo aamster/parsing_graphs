@@ -69,7 +69,6 @@ class SegmentLinePlotModel(lightning.LightningModule):
             preds: torch.Tensor = self.model(data)
         preds = F.sigmoid(preds)
         preds = (preds > 0.5).type(torch.uint8)
-
         return preds
 
     def on_train_start(self) -> None:

@@ -8,13 +8,14 @@ import cv2
 import numpy as np
 import torch.utils.data
 from sklearn.cluster import KMeans
+from torch import Tensor
 from torch.utils.data.dataset import T_co
 from torchvision import datapoints, io
 from torchvision.utils import draw_keypoints
 from torchvision.transforms.v2 import functional as F
 
 
-from parse_plots.utils import string_to_float
+from parse_plots.utils import string_to_float, resize_plot_bounding_box
 
 
 class BadDataError(RuntimeError):
@@ -29,14 +30,24 @@ plot_type_id_map = {
     'scatter': 5
 }
 
+plot_type_id_value_map = {
+    1: 'dot',
+    2: 'horizontal_bar',
+    3: 'vertical_bar',
+    4: 'line',
+    5: 'scatter'
+}
+
 
 class DetectPlotValuesDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         plot_ids: List[str],
         plots_dir,
-        annotations_dir,
-        transform
+        transform,
+        annotations_dir: Optional[Path] = None,
+        is_train: bool = True,
+        plot_meta: Optional[Dict[str, Dict]] = None
     ):
         super().__init__()
         bad_ids = [
@@ -107,17 +118,38 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
             'ed5d7906928c',
             'd7f597a3b9c9'
         ]
-        plot_ids = [x for x in plot_ids if x not in bad_ids]
-        plot_files = os.listdir(plots_dir)
-        self._plot_files = [x for x in plot_files if Path(x).stem in plot_ids]
+        if is_train:
+            plot_ids = [x for x in plot_ids if x not in bad_ids]
+            if annotations_dir is None:
+                raise ValueError('annotations_dir must be given if train')
+        self._plot_files = [f'{x}.jpg' for x in plot_ids]
         self._plots_dir = Path(plots_dir)
-        self._annotations_dir = Path(annotations_dir)
+        self._annotations_dir = Path(annotations_dir) \
+            if annotations_dir is not None else None
         self._transform = transform
+        self._is_train = is_train
+        self._plot_meta = plot_meta
 
     def __getitem__(self, index) -> T_co:
         id = Path(self._plot_files[index]).stem
         img = io.read_image(str(self._plots_dir / f'{id}.jpg'))
         img = datapoints.Image(img)
+
+        if not self._is_train:
+            if self._plot_meta is None:
+                raise ValueError('plot_meta must be given if not train')
+            plot_bb = self._plot_meta[id]['plot_bbox']
+            plot_bb = resize_plot_bounding_box(
+                img=img,
+                plot_bounding_box=plot_bb
+            )
+            if self._transform is not None:
+                img = self._transform(img)
+
+            return img, {
+                'image_id': id,
+                'plot_bbox': plot_bb
+            }
 
         with open(self._annotations_dir / f'{id}.json') as f:
             a = json.load(f)
@@ -242,18 +274,6 @@ def get_targets(img, a: Dict):
     return bboxes
 
 
-def get_plot_bbox(a: Dict):
-    bbox = a['plot-bb']
-    bbox = [
-        bbox['x0'],
-        bbox['y0'],
-        bbox['x0'] + bbox['width'],
-        bbox['y0'] + bbox['height']
-    ]
-    bboxes = [bbox]
-    return bboxes
-
-
 def get_bboxes_for_dot(a: Dict, x_pts, y_pts, dot_width, dot_height):
     pts = list(zip(x_pts, y_pts))
     boxes = []
@@ -319,12 +339,14 @@ def get_bounding_boxes(img, a, x_pts, y_pts, **kwargs):
     return bboxes
 
 
-def get_points(img, a):
+def get_points(a, img: Optional[Tensor] = None):
     if a['chart-type'] == 'line':
         x_pts, y_pts = get_line_points(a=a)
     elif a['chart-type'] == 'scatter':
         x_pts, y_pts = get_scatter_points(a=a)
     elif a['chart-type'] == 'dot':
+        if img is None:
+            raise ValueError('must provide img if dot')
         x_pts, y_pts, dot_width, dot_height = get_dot_points(img=img)
         return x_pts, y_pts, dot_width, dot_height
     else:

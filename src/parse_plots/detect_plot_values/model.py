@@ -5,6 +5,8 @@ import lightning
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 
+from parse_plots.detect_axes_labels_text.detect_text import sort_boxes
+from parse_plots.detect_plot_values.dataset import plot_type_id_value_map
 from parse_plots.utils import convert_to_tensor
 
 
@@ -81,6 +83,15 @@ class DetectPlotValuesModel(lightning.LightningModule):
             # only include confident predictions
             preds[i]['boxes'] = preds[i]['boxes'][preds[i]['scores'] > 0.5]
             preds[i]['labels'] = preds[i]['labels'][preds[i]['scores'] > 0.5]
+
+            predicted_plot_type = preds[i]['labels'].mode().values.item()
+            predicted_plot_type = plot_type_id_value_map[predicted_plot_type]
+            sort_idx = sort_boxes(
+                preds[i]['boxes'],
+                axis=('x-axis' if predicted_plot_type != 'horizontal_bar'
+                      else 'y-axis'))
+            preds[i]['boxes'] = preds[i]['boxes'][sort_idx]
+            preds[i]['labels'] = preds[i]['labels'][sort_idx]
 
         return preds
 

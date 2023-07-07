@@ -6,6 +6,7 @@ import numpy as np
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 
+from parse_plots.detect_axes_labels_text.detect_text import sort_boxes
 from parse_plots.utils import threshold_soft_masks, convert_to_tensor
 
 
@@ -73,24 +74,51 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             batch_idx: int,
             dataloader_idx: int = 0
     ):
+        img, target = batch
         preds = self._get_predictions(batch=batch)
 
-        for i in range(len(preds)):
+        sorted_preds = {}
+        for pred_idx in range(len(preds)):
             # only include confident predictions
-            preds[i]['boxes'] = preds[i]['boxes'][preds[i]['scores'] > 0.5]
-            preds[i]['masks'] = preds[i]['masks'][preds[i]['scores'] > 0.5]
-            preds[i]['labels'] = preds[i]['labels'][preds[i]['scores'] > 0.5]
+            preds[pred_idx]['boxes'] = preds[pred_idx]['boxes'][preds[pred_idx]['scores'] > 0.5]
+            preds[pred_idx]['masks'] = preds[pred_idx]['masks'][preds[pred_idx]['scores'] > 0.5]
+            preds[pred_idx]['labels'] = preds[pred_idx]['labels'][preds[pred_idx]['scores'] > 0.5]
 
-            preds[i] = self._remove_outlier_box_predictions(
-                pred=preds[i]
+            preds[pred_idx] = self._remove_outlier_box_predictions(
+                pred=preds[pred_idx]
             )
 
-        return preds
+            boxes = preds[pred_idx]['boxes']
+            masks = preds[pred_idx]['masks']
+            labels = preds[pred_idx]['labels']
+
+            x_axis_idxs = torch.where(labels == 1)[0]
+            y_axis_idxs = torch.where(labels == 2)[0]
+            x_axis_sort_idx = sort_boxes(
+                boxes[x_axis_idxs],
+                axis='x-axis')
+            y_axis_sort_idx = sort_boxes(
+                boxes[y_axis_idxs],
+                axis='y-axis')
+            sorted_preds[target['image_id'][pred_idx]] = {
+                'x-axis': {
+                    'boxes': boxes[x_axis_idxs][x_axis_sort_idx],
+                    'masks': masks[x_axis_idxs][x_axis_sort_idx],
+                    'labels': labels[x_axis_idxs][x_axis_sort_idx],
+                },
+                'y-axis': {
+                    'boxes': boxes[y_axis_idxs][y_axis_sort_idx],
+                    'masks': masks[y_axis_idxs][y_axis_sort_idx],
+                    'labels': labels[y_axis_idxs][y_axis_sort_idx],
+                }
+            }
+
+        return sorted_preds
 
     def _get_predictions(self, batch):
         with evaluate(model=self.model):
             with torch.no_grad():
-                data, target = batch
+                data, _ = batch
                 preds = self.model(data)
 
         preds = threshold_soft_masks(preds=preds)
