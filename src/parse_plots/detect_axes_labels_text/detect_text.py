@@ -383,6 +383,10 @@ class DetectText:
 
 
 def try_convert_numeric(x) -> Union[int, float, str]:
+    # if there are any letters, don't convert
+    if re.findall(r'[a-zA-Z]', x):
+        return x
+
     valid_comma = re.search(r',\d{3}', x) is not None
     if ',' in x and not valid_comma:
         # assume it is a dot ?
