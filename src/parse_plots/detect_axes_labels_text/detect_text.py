@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Dict, List, Union
@@ -8,16 +7,19 @@ import cv2
 import numpy as np
 import pandas as pd
 import torch
+import torchvision
 from PIL import Image
 from easyocr.recognition import get_text
-from easyocr.utils import get_image_list, reformat_input, get_paragraph
+from easyocr.utils import get_image_list, reformat_input
 from scipy import stats
+
+torchvision.disable_beta_transforms_warning()
+
 from torchvision import datapoints
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
 from tqdm import tqdm
 
-from parse_plots.find_axes_tick_labels.dataset import axes_label_map
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -112,8 +114,6 @@ class DetectText:
             axis_text = {}
 
             img = Image.open(f'{self._images_dir / file_id}.jpg')
-            img = datapoints.Image(img)
-
             img = datapoints.Image(img)
 
             for axis, axis_pred in pred.items():
@@ -385,6 +385,11 @@ class DetectText:
 def try_convert_numeric(x) -> Union[int, float, str]:
     # if there are any letters, don't convert
     if re.findall(r'[a-zA-Z]', x):
+        return x
+
+    if '-' in x and x.index('-') > 0:
+        # "-" in the string and it's in the middle
+        # assume it's a string
         return x
 
     valid_comma = re.search(r',\d{3}', x) is not None

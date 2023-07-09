@@ -1,6 +1,8 @@
+import math
 import os
+import time
 from pathlib import Path
-from typing import Dict, Tuple, List, Any, Optional
+from typing import Dict, Tuple, List, Any
 
 import argschema as argschema
 import cv2
@@ -20,6 +22,9 @@ from parse_plots.detect_plot_values.line_segmentation_model import \
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.models import efficientnet_b1
+
+torchvision.disable_beta_transforms_warning()
+
 import torchvision.transforms.v2 as T
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_V2_Weights, \
     maskrcnn_resnet50_fpn_v2
@@ -35,8 +40,6 @@ from parse_plots.detect_plot_values.model import DetectPlotValuesModel
 from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset
 from parse_plots.find_axes_tick_labels.model import SegmentAxesTickLabelsModel
 
-torchvision.disable_beta_transforms_warning()
-
 
 class ParsePlotsSchema(argschema.ArgSchema):
     plots_dir = argschema.fields.InputDir(required=True)
@@ -48,6 +51,7 @@ class ParsePlotsSchema(argschema.ArgSchema):
     plot_object_detector_checkpoint = argschema.fields.InputFile(required=True)
     out_dir = argschema.fields.OutputDir(required=True)
     is_debug = argschema.fields.Boolean(default=False)
+    batch_size = argschema.fields.Int(default=8)
 
 
 class ParsePlotsRunner(argschema.ArgSchemaParser):
@@ -60,7 +64,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:16]
+            plot_ids = plot_ids[:64]
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -90,7 +94,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
     def run(self):
 
         all_data_series = []
-        for axes_segmentations in self._find_axes_tick_labels():
+        all_axes_segmentations = self._find_axes_tick_labels()
+        n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
+        for batch_idx, axes_segmentations in enumerate(all_axes_segmentations,
+                                                       start=1):
+            start = time.time()
+            self.logger.info(
+                f'{batch_idx}/{n_batches} Getting plot values for '
+                f'{list(axes_segmentations.keys())}')
             plot_types = self._classify_plot_type(
                 axes_segmentations=axes_segmentations
             )
@@ -111,11 +122,29 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 for i in range(len(plot_points)):
                     plot_point = [plot_points[i][0], plot_points[i][1]]
                     if plot_point[0] is None:
-                        plot_point[0] = tick_labels[file_id]['x-axis'][i]
+                        if i >= len(tick_labels[file_id]['x-axis']):
+                            # more plot values than ticks (in the case of bar
+                            # chart is a problem)
+                            plot_point[0] = ''
+                        else:
+                            plot_point[0] = tick_labels[file_id]['x-axis'][i]
+
                     if plot_point[1] is None:
-                        plot_point[1] = tick_labels[file_id]['y-axis'][i]
+                        if i >= len(tick_labels[file_id]['y-axis']):
+                            # more plot values than ticks (in the case of bar
+                            # chart is a problem)
+                            plot_point[1] = ''
+                        else:
+                            plot_point[1] = tick_labels[file_id]['y-axis'][i]
+
                     plot_points_.append(tuple(plot_point))
                 file_id_plot_values_map[file_id] = plot_points_
+
+                duration = time.time() - start
+                self.logger.info(
+                    f'Finished in {duration:.0f} seconds, '
+                    f'{(n_batches - batch_idx) * duration:.0f} '
+                    f'seconds remaining')
             data_series = self._construct_data_series(
                 plot_types=plot_types,
                 file_id_plot_values_map=file_id_plot_values_map
@@ -178,19 +207,24 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             )
 
             if plot_types[file_id] == 'dot':
-                tick_dot_count = {i: 0 for i in range(len(axes['x-axis']))}
-                for x, y in img_coordinates:
-                    dists = [abs(x - tick_pt['tick_pt'])
-                             for tick_pt in axes['x-axis']]
-                    min_dist = np.argmin(dists)
-                    tick_dot_count[axes['x-axis'][min_dist]['tick_id']] += 1
-                x_axis_tick_ids = [x['tick_id'] for x in axes['x-axis']]
+                tick_values = self._get_tick_values(
+                    axis=axes['x-axis'],
+                    plot_values=img_coordinates,
+                    axis_name='x-axis'
+                )
                 file_id_plot_points_map[file_id] = list(zip(
                     tick_labels[file_id]['x-axis'],
-                    [tick_dot_count[x]for x in x_axis_tick_ids]
+                    [len(tick_values[tick_id]) for tick_id in tick_values]
                 ))
 
             else:
+                if plot_types[file_id] in ('vertical_bar', 'horizontal_bar'):
+                    # Fix issue with multiple boxes per bar
+                    img_coordinates = self._remove_duplicate_values_per_bar(
+                        plot_values=img_coordinates,
+                        plot_type=plot_types[file_id],
+                        axes=axes
+                    )
                 plot_points = []
                 for coord in img_coordinates:
                     plot_point_values = []
@@ -243,6 +277,60 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return file_id_plot_points_map
 
     @staticmethod
+    def _get_tick_values(axis: List[Dict], plot_values, axis_name: str):
+        """For each tick mark, get the values associated with it
+        (found by finding values closest to it)"""
+        min_dists = np.zeros(len(plot_values))
+        tick_min_dist_idx = np.zeros(len(plot_values))
+        tick_values = {x['tick_id']: [] for x in axis}
+        for i, (x, y) in enumerate(plot_values):
+            plot_value = x if axis_name == 'x-axis' else y
+            dists = [abs(plot_value - tick_pt['tick_pt'])
+                     for tick_pt in axis]
+            min_dist = np.argmin(dists)
+            tick_min_dist_idx[i] = min_dist
+            min_dists[i] = np.min(dists)
+
+
+        # protect against a plot value getting assigned to the wrong tick
+        # happens in case of bar where we miss the tick mark
+        q1, q3 = np.quantile(min_dists, (0.25, 0.75))
+        iqr = q3 - q1
+
+        for i, min_dist in enumerate(min_dists):
+            if q1 - iqr * 1.5 <= min_dist <= q3 + iqr * 1.5:
+                tick_values[axis[int(tick_min_dist_idx[i])]['tick_id']]\
+                    .append(plot_values[i])
+
+        return tick_values
+
+    def _remove_duplicate_values_per_bar(
+            self,
+            plot_type: str,
+            axes: Dict,
+            plot_values: List[Tuple]
+    ) -> List[Tuple]:
+        """Removes duplicate values per tick for bar. Uses the naive assumption
+        that the largest/smallest coord corresponds to the correct box?"""
+        values_to_keep = set()
+        tick_values = self._get_tick_values(
+            axis=(axes['x-axis'] if plot_type == 'vertical_bar'
+                  else axes['y-axis']),
+            plot_values=plot_values,
+            axis_name='x-axis' if plot_type == 'vertical_bar' else 'y-axis'
+        )
+        for tick_id, values in tick_values.items():
+            if not values:
+                continue
+            if plot_type == 'horizontal_bar':
+                values_to_keep.add(
+                    sorted(values, key=lambda x: x[0])[-1])
+            else:
+                values_to_keep.add(
+                    sorted(values, key=lambda x: x[1])[0])
+        return [x for x in plot_values if x in values_to_keep]
+
+    @staticmethod
     def _get_closest_tick_label_in_image_coordinates(
             coord: Tuple[int, int],
             axis: str,
@@ -292,6 +380,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         for mask in axes_segmentations['x-axis']['masks']:
             rect = DetectText.get_min_area_rect(mask=mask)
             box_points = cv2.boxPoints(rect)
+
+            # fix for box points outside of image
+            for i in range(box_points.shape[0]):
+                box_points[i][0] = max(box_points[i][0], 0)
+                box_points[i][0] = min(mask.shape[1]-1, box_points[i][0])
+
+                box_points[i][1] = max(box_points[i][1], 0)
+                box_points[i][1] = min(mask.shape[0]-1, box_points[i][1])
 
             angle = rect[-1]
 
@@ -392,7 +488,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
         data_module = PlotDataModule(
             plots_dir=self.args['plots_dir'],
-            batch_size=8,
+            batch_size=self.args['batch_size'],
             dataset_class=DetectPlotValuesDataset,
             num_workers=0 if self._is_debug else os.cpu_count(),
             file_id_chart_type_map_path=plot_types,
@@ -463,7 +559,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         )
         data_loader = DataLoader(
             dataset=dataset,
-            batch_size=8 if self.args['is_debug'] else 64,
+            batch_size=self.args['batch_size'],
             num_workers=os.cpu_count(),
             shuffle=False
         )
@@ -519,11 +615,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                               else None)
         )
 
-        batch_size = 8
+        batch_size = self.args['batch_size']
         for start in torch.arange(0, len(self._plot_ids), batch_size):
             data_module = PlotDataModule(
                 plots_dir=self.args['plots_dir'],
-                batch_size=8,
+                batch_size=batch_size,
                 dataset_class=FindAxesTickLabelsDataset,
                 num_workers=0 if self._is_debug else os.cpu_count(),
                 plot_ids=self._plot_ids[start:start+batch_size],

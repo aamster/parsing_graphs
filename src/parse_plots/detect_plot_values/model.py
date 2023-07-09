@@ -4,6 +4,7 @@ from typing import Dict, Any
 import lightning
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
+from torchvision.ops import nms
 
 from parse_plots.detect_axes_labels_text.detect_text import sort_boxes
 from parse_plots.detect_plot_values.dataset import plot_type_id_value_map

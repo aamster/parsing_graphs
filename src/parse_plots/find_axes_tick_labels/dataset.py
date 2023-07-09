@@ -6,9 +6,14 @@ from typing import List, Dict, Optional
 import cv2
 import numpy as np
 import torch.utils.data
+import torchvision
 from torch.utils.data.dataset import T_co
+
+torchvision.disable_beta_transforms_warning()
+
 from torchvision import datapoints, io
 from torchvision.transforms.v2 import functional as F
+
 
 # 0 indicates background - IMPORTANT !!
 axes_label_map = {

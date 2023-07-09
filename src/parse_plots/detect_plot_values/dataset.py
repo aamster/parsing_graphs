@@ -7,15 +7,22 @@ from typing import List, Dict, Literal, Optional
 import cv2
 import numpy as np
 import torch.utils.data
+import torchvision
 from sklearn.cluster import KMeans
 from torch import Tensor
 from torch.utils.data.dataset import T_co
+
+torchvision.disable_beta_transforms_warning()
+
 from torchvision import datapoints, io
 from torchvision.utils import draw_keypoints
+
 from torchvision.transforms.v2 import functional as F
 
 
 from parse_plots.utils import string_to_float, resize_plot_bounding_box
+
+torchvision.disable_beta_transforms_warning()
 
 
 class BadDataError(RuntimeError):

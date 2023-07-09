@@ -2,8 +2,10 @@ import re
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
+import torchvision
+torchvision.disable_beta_transforms_warning()
+
 from torchvision import datapoints
 from torchvision.transforms import v2 as T
 from torchvision.transforms.v2 import functional as F
