@@ -12,6 +12,7 @@ from PIL import Image
 from easyocr.recognition import get_text
 from easyocr.utils import get_image_list, reformat_input
 from scipy import stats
+from sklearn.linear_model import LinearRegression
 
 torchvision.disable_beta_transforms_warning()
 
@@ -159,9 +160,25 @@ class DetectText:
                 # protect against all string values
                 if all(isinstance(x, str) for x in axis_text):
                     pass
+                elif all(isinstance(x, (int, float)) for x in axis_text):
+                    pass
                 else:
-                    # If not numeric, set to null
-                    axis_text = [x if isinstance(x, (int, float)) else np.nan for x in axis_text]
+                    # If not numeric, interpolate
+                    reg = LinearRegression()
+                    numeric_text_idx = [
+                        i for i in range(len(axis_text))
+                        if isinstance(axis_text[i], (int, float))]
+                    non_numeric_text = [i for i in range(len(axis_text))
+                                        if i not in numeric_text_idx]
+                    reg.fit(
+                        np.array(numeric_text_idx).reshape(-1, 1),
+                        np.array(axis_text)[numeric_text_idx].reshape(-1, 1))
+                    preds = reg.predict(
+                        np.array(non_numeric_text).reshape(-1, 1)).flatten()
+                    preds = dict(zip(non_numeric_text, preds))
+                    axis_text = [
+                        axis_text[i] if i in numeric_text_idx else preds[i]
+                        for i in range(len(axis_text))]
 
                     # TODO there's too many edge cases to get this right.
                     # maybe better to just finetune ocr model
