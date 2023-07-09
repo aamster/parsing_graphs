@@ -11,10 +11,7 @@ def sigmoid(x):
 def normalized_rmse(y_true, y_pred):
     # The argument to the sigmoid transform is equal to
     # rmse(y_true, y_pred) / rmse(y_true, np.mean(y_true))
-    try:
-        return sigmoid((1 - r2_score(y_true, y_pred)) ** 0.5)
-    except:
-        pass
+    return sigmoid((1 - r2_score(y_true, y_pred)) ** 0.5)
 
 
 def normalized_levenshtein_score(y_true, y_pred):
@@ -34,7 +31,7 @@ def score_series(y_true, y_pred):
 
 
 def benetech_score(ground_truth: pd.DataFrame,
-                   predictions: pd.DataFrame) -> float:
+                   predictions: pd.DataFrame) -> pd.DataFrame:
     """Evaluate predictions using the metric from the Benetech - Making
     Graphs Accessible.
 
@@ -53,12 +50,14 @@ def benetech_score(ground_truth: pd.DataFrame,
     if not ground_truth.columns.equals(predictions.columns):
         raise ValueError(
             f"Predictions must have columns: {ground_truth.columns}.")
-    pairs = zip(ground_truth.itertuples(index=False),
+    pairs = zip(ground_truth.itertuples(),
                 predictions.itertuples(index=False))
     scores = []
-    for (gt_series, gt_type), (pred_series, pred_type) in pairs:
+    for (image_id, gt_series, gt_type), (pred_series, pred_type) in pairs:
         if gt_type != pred_type:  # Check chart_type condition
-            scores.append(0.0)
+            scores.append({'image_id': image_id, 'score': 0.0})
         else:  # Score with RMSE or Levenshtein as appropriate
-            scores.append(score_series(gt_series, pred_series))
-    return np.mean(scores)
+            score = score_series(gt_series, pred_series)
+            scores.append({'image_id': image_id, 'score': score})
+    scores = pd.DataFrame(scores).set_index('image_id')
+    return scores
