@@ -373,9 +373,15 @@ class DetectText:
         center, size, angle = cv2.minAreaRect(contour)
         x, y, w, h = cv2.boundingRect(contour)
         #     print(w, h)
-        if h > 2 * w and angle == 90:
-            # probably vertical text and angle should be 0
-            angle = 0
+        if h > 2 * w:
+            if angle == 90:
+                # probably vertical text and angle should be 0
+                angle = 0
+        else:
+            if angle == 0:
+                # probably horizontal text. angle should be 90
+                angle = 90
+
         return center, size, angle
 
     @staticmethod
@@ -408,6 +414,12 @@ def try_convert_numeric(x) -> Union[int, float, str]:
         # "-" in the string and it's in the middle
         # assume it's a string
         return x
+
+    dots = [v for v in x if v == '.']
+    if len(dots) > 1:
+        # european comma?
+        # like 7.000.000
+        x = x.replace('.', '')
 
     valid_comma = re.search(r',\d{3}', x) is not None
     if ',' in x and not valid_comma:
