@@ -1,6 +1,7 @@
 import math
 import os
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Tuple, List, Any
 
@@ -64,7 +65,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:256]
+            #plot_ids = plot_ids[:256]
+            plot_ids = ['0a2a7c40e9a6']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -206,79 +208,89 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 axes_segmentations=axes_segmentations[file_id]
             )
 
-            if plot_types[file_id] == 'dot':
-                tick_values = self._get_tick_values(
-                    axis=axes['x-axis'],
+            if plot_types[file_id] in ('vertical_bar', 'horizontal_bar'):
+                # Fix issue with multiple boxes per bar
+                img_coordinates = self._remove_duplicate_values_per_bar(
                     plot_values=img_coordinates,
-                    axis_name='x-axis'
+                    plot_type=plot_types[file_id],
+                    axes=axes
                 )
-                file_id_plot_points_map[file_id] = list(zip(
-                    tick_labels[file_id]['x-axis'],
-                    [len(tick_values[tick_id]) for tick_id in tick_values]
-                ))
+            plot_points = []
+            for coord in img_coordinates:
+                plot_point_values = []
+                for axis, axis_idx in [('x', 0), ('y', 1)]:
 
-            else:
-                if plot_types[file_id] in ('vertical_bar', 'horizontal_bar'):
-                    # Fix issue with multiple boxes per bar
-                    img_coordinates = self._remove_duplicate_values_per_bar(
-                        plot_values=img_coordinates,
-                        plot_type=plot_types[file_id],
-                        axes=axes
-                    )
-                plot_points = []
-                for coord in img_coordinates:
-                    plot_point_values = []
-                    for axis, axis_idx in [('x', 0), ('y', 1)]:
+                    if len(axes_segmentations[file_id][f'{axis}-axis']['boxes'])\
+                            == 0:
+                        plot_point_values.append(None)
+                        continue
 
-                        if len(axes_segmentations[file_id][f'{axis}-axis']['boxes'])\
-                                == 0:
-                            plot_point_values.append(None)
-                            continue
+                    closest_tick_label_idx = \
+                        self._get_closest_tick_label_in_image_coordinates(
+                            coord=coord,
+                            axis=axis,
+                            axes_segmentations=axes_segmentations[file_id][f'{axis}-axis']
+                        )
+                    closest_tick_pt = axes[f'{axis}-axis'][closest_tick_label_idx]
+                    closest_tick_val = (
+                        tick_labels[file_id][f'{axis}-axis']
+                        [closest_tick_label_idx])
 
-                        closest_tick_label_idx = \
-                            self._get_closest_tick_label_in_image_coordinates(
-                                coord=coord,
-                                axis=axis,
-                                axes_segmentations=axes_segmentations[file_id][f'{axis}-axis']
-                            )
-                        closest_tick_pt = axes[f'{axis}-axis'][closest_tick_label_idx]
-                        closest_tick_val = (
-                            tick_labels[file_id][f'{axis}-axis']
-                            [closest_tick_label_idx])
+                    if isinstance(closest_tick_val, str):
+                        plot_point_values.append(None)
+                    else:
+                        axis_spacing = abs(
+                            axes[f'{axis}-axis'][1]['tick_pt'] -
+                            axes[f'{axis}-axis'][0]['tick_pt'])
+                        axis_diff = abs(
+                            tick_labels[file_id][f'{axis}-axis'][0] -
+                            tick_labels[file_id][f'{axis}-axis'][1])
+                        diff_from_closest_tick_val = \
+                            abs(closest_tick_pt['tick_pt'] -
+                                coord[axis_idx]) / axis_spacing * axis_diff
 
-                        if isinstance(closest_tick_val, str):
-                            plot_point_values.append(None)
-                        else:
-                            axis_spacing = abs(
-                                axes[f'{axis}-axis'][1]['tick_pt'] -
-                                axes[f'{axis}-axis'][0]['tick_pt'])
-                            axis_diff = abs(
-                                tick_labels[file_id][f'{axis}-axis'][0] -
-                                tick_labels[file_id][f'{axis}-axis'][1])
-                            diff_from_closest_tick_val = \
-                                abs(closest_tick_pt['tick_pt'] -
-                                    coord[axis_idx]) / axis_spacing * axis_diff
-
-                            if axis == 'y':
-                                # coordinates increase but values decrease
-                                if (coord[axis_idx] >
-                                        closest_tick_pt['tick_pt']):
-                                    plot_val = (closest_tick_val -
-                                                diff_from_closest_tick_val)
-                                else:
-                                    plot_val = (closest_tick_val +
-                                                diff_from_closest_tick_val)
+                        if axis == 'y':
+                            # coordinates increase but values decrease
+                            if (coord[axis_idx] >
+                                    closest_tick_pt['tick_pt']):
+                                plot_val = (closest_tick_val -
+                                            diff_from_closest_tick_val)
                             else:
-                                # coordinates increase and values increase
-                                if (coord[axis_idx] >
-                                        closest_tick_pt['tick_pt']):
-                                    plot_val = (closest_tick_val +
-                                                diff_from_closest_tick_val)
-                                else:
-                                    plot_val = (closest_tick_val -
-                                                diff_from_closest_tick_val)
-                            plot_point_values.append(plot_val)
-                    plot_points.append(plot_point_values)
+                                plot_val = (closest_tick_val +
+                                            diff_from_closest_tick_val)
+                        else:
+                            # coordinates increase and values increase
+                            if (coord[axis_idx] >
+                                    closest_tick_pt['tick_pt']):
+                                plot_val = (closest_tick_val +
+                                            diff_from_closest_tick_val)
+                            else:
+                                plot_val = (closest_tick_val -
+                                            diff_from_closest_tick_val)
+                        plot_point_values.append(plot_val)
+                plot_points.append(plot_point_values)
+
+            if plot_types[file_id] == 'dot':
+                x_axis_numeric = \
+                    isinstance(tick_labels[file_id]['x-axis'][0],
+                               (int, float))
+                dot_counts = defaultdict(int)
+
+                for coord_idx in range(len(plot_points)):
+                    x, y = plot_points[coord_idx]
+
+                    if isinstance(x, (int, float)):
+                        x = round(x)
+                    dot_counts[x] += 1
+                if x_axis_numeric:
+                    plot_points = [
+                        [k, dot_counts[k]] for k in sorted(dot_counts)]
+                else:
+                    plot_points = [
+                        [k, dot_counts[k]] for k in
+                        tick_labels[file_id]['x-axis']
+                    ]
+
                 file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
