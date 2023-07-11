@@ -64,7 +64,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:64]
+            plot_ids = plot_ids[:256]
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -229,6 +229,12 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 for coord in img_coordinates:
                     plot_point_values = []
                     for axis, axis_idx in [('x', 0), ('y', 1)]:
+
+                        if len(axes_segmentations[file_id][f'{axis}-axis']['boxes'])\
+                                == 0:
+                            plot_point_values.append(None)
+                            continue
+
                         closest_tick_label_idx = \
                             self._get_closest_tick_label_in_image_coordinates(
                                 coord=coord,
@@ -511,13 +517,28 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             x_axis_segmentations = axes_segmentations[file_id]['x-axis']
             y_axis_segmentations = axes_segmentations[file_id]['y-axis']
 
-            x0 = (x_axis_segmentations['boxes'][0][0] +
-                  x_axis_segmentations['boxes'][0][2]) / 2
-            y0 = (y_axis_segmentations['boxes'][-1][1] +
-                  y_axis_segmentations['boxes'][-1][3]) / 2
-            x1 = x_axis_segmentations['boxes'][-1][2]
-            y1 = (y_axis_segmentations['boxes'][0][3] +
-                  y_axis_segmentations['boxes'][0][1]) / 2
+            if len(x_axis_segmentations['boxes']) > 0:
+                x0 = (x_axis_segmentations['boxes'][0][0] +
+                      x_axis_segmentations['boxes'][0][2]) / 2
+            else:
+                x0 = torch.tensor(0)
+
+            if len(y_axis_segmentations['boxes']) > 0:
+                y0 = (y_axis_segmentations['boxes'][-1][1] +
+                      y_axis_segmentations['boxes'][-1][3]) / 2
+            else:
+                y0 = torch.tensor(0)
+
+            if len(x_axis_segmentations['boxes']) > 0:
+                x1 = x_axis_segmentations['boxes'][-1][2]
+            else:
+                x1 = torch.tensor(448)
+
+            if len(y_axis_segmentations['boxes']) > 0:
+                y1 = (y_axis_segmentations['boxes'][0][3] +
+                      y_axis_segmentations['boxes'][0][1]) / 2
+            else:
+                y1 = torch.tensor(448)
 
             height = y1 - y0
             width = x1 - x0

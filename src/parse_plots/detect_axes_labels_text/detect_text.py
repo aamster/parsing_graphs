@@ -130,7 +130,10 @@ class DetectText:
                     self._preprocess_cropped_text(img=img, mask=mask)
                     for mask in masks]
 
-                text = self._get_text(imgs=cropped_images)
+                if len(cropped_images) > 0:
+                    text = self._get_text(imgs=cropped_images)
+                else:
+                    text = []
                 text = np.array(text)
                 axis_text[axis] = text
             res[file_id] = axis_text
@@ -140,11 +143,12 @@ class DetectText:
                     axis=axis,
                     plot_type=self._plot_types[file_id],
                     axis_text=axis_text[axis]
-                ) for axis in ('x-axis', 'y-axis')}
+                ) if len(axis_text[axis]) > 0 else []
+                for axis in ('x-axis', 'y-axis')}
         return res
 
+    @staticmethod
     def _postprocess_text(
-        self,
         axis_text,
         axis,
         plot_type
