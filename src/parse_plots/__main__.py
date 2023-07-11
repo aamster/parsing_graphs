@@ -66,7 +66,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:256]
-            plot_ids = ['0a2a7c40e9a6']
+            plot_ids = ['histogram_example']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -291,7 +291,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         tick_labels[file_id]['x-axis']
                     ]
 
-                file_id_plot_points_map[file_id] = plot_points
+            file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
     @staticmethod
