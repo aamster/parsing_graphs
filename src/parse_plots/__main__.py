@@ -66,7 +66,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:256]
-            plot_ids = ['histogram_example']
+            plot_ids = ['horizontal_bar_example']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -140,6 +140,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                             plot_point[1] = tick_labels[file_id]['y-axis'][i]
 
                     plot_points_.append(tuple(plot_point))
+
+                if plot_types[file_id] == 'horizontal_bar':
+                    plot_points_ = plot_points_[::-1]
                 file_id_plot_values_map[file_id] = plot_points_
 
                 duration = time.time() - start
@@ -291,6 +294,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         tick_labels[file_id]['x-axis']
                     ]
 
+            if plot_types[file_id] == 'vertical_bar' and \
+                    len(plot_points) > 0 and \
+                    isinstance(plot_points[0][0], float):
+                # it's a histogram
+                plot_points = list(zip(
+                    tick_labels[file_id]['x-axis'],
+                    [x[1] for x in plot_points])) + \
+                    [(tick_labels[file_id]['x-axis'][-1],
+                      'HISTOGRAM_PLACEHOLDER')]
             file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
@@ -699,7 +711,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         res = []
         for file_id, plot_values in file_id_plot_values_map.items():
             for axis, axis_idx in [('x', 0), ('y', 1)]:
-                data_series = ';'.join([str(x[axis_idx]) for x in plot_values])
+                data_series = ';'.join([
+                    str(x[axis_idx]) for x in plot_values
+                    if x[axis_idx] != 'HISTOGRAM_PLACEHOLDER'])
                 res.append({
                     'id': f'{file_id}_{axis}',
                     'data_series': data_series,
