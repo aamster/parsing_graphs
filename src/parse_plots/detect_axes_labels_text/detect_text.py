@@ -39,7 +39,7 @@ plot_expected_type_map = {
         'y-axis': ['numeric', None]
     },
     'line': {
-        'x-axis': ['categorical', 'numeric'],
+        'x-axis': ['categorical'],
         'y-axis': 'numeric'
     },
     'scatter': {
