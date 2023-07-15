@@ -151,11 +151,12 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
                 plot_bounding_box=plot_bb
             )
             if self._transform is not None:
-                img = self._transform(img)
+                img = self._transform(id)(img)
 
             return img, {
                 'image_id': id,
-                'plot_bbox': plot_bb
+                'plot_bbox': plot_bb,
+                'image_shape': img.shape
             }
 
         with open(self._annotations_dir / f'{id}.json') as f:

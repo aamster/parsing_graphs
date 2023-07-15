@@ -4,6 +4,7 @@ from typing import Dict, Any
 import lightning
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
+from torchvision import datapoints
 from torchvision.ops import nms
 
 from parse_plots.detect_axes_labels_text.detect_text import sort_boxes
@@ -93,6 +94,12 @@ class DetectPlotValuesModel(lightning.LightningModule):
                       else 'y-axis'))
             preds[i]['boxes'] = preds[i]['boxes'][sort_idx]
             preds[i]['labels'] = preds[i]['labels'][sort_idx]
+
+            preds[i]['boxes'] = datapoints.BoundingBox(
+                preds[i]['boxes'],
+                format=datapoints.BoundingBoxFormat.XYXY,
+                spatial_size=batch[1][i]['image_shape'][1:]
+            )
 
         return preds
 

@@ -27,6 +27,7 @@ from torchvision.models import efficientnet_b1
 torchvision.disable_beta_transforms_warning()
 
 import torchvision.transforms.v2 as T
+import torchvision.transforms.functional as F_transforms
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_V2_Weights, \
     maskrcnn_resnet50_fpn_v2
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, \
@@ -66,7 +67,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:256]
-            plot_ids = ['horizontal_bar_example']
+            plot_ids = ['line_graph_example']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -142,7 +143,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     plot_points_.append(tuple(plot_point))
 
                 if plot_types[file_id] == 'horizontal_bar':
-                    plot_points_ = plot_points_[::-1]
+                    plot_points_ = list(zip(
+                        [x[0] for x in plot_points_],
+                        [x[1] for x in plot_points_][::-1]))
                 file_id_plot_values_map[file_id] = plot_points_
 
                 duration = time.time() - start
@@ -197,6 +200,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             )
             predictions = predictions[0]
             for i, plot_id in enumerate(other_plot_ids):
+                if plot_types[plot_id] == 'horizontal_bar':
+                    predictions[i]['boxes'] = T.RandomRotation(
+                        degrees=(-90, -90))(predictions[i]['boxes'])
                 plot_values_img_coordinates.append((
                     plot_id,
                     self._get_plot_values_in_img_coordinates(
@@ -496,11 +502,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
         if isinstance(model, DetectPlotValuesModel):
 
-            transform = T.Compose([
-                T.ToImageTensor(),
-                T.ConvertImageDtype(torch.float32),
-                T.Resize([448, 448])
-            ])
+            def transform(image_id):
+                return T.Compose([
+                    T.ToImageTensor(),
+                    T.ConvertImageDtype(torch.float32),
+                    T.Resize([448, 448]),
+                    lambda img: (
+                        F_transforms.rotate(img=img, angle=90)
+                        if plot_types[image_id] == 'horizontal_bar' else img)
+                ])
         else:
             transform = T.Compose([
                 T.ToImageTensor(),
