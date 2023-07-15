@@ -67,7 +67,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:256]
-            plot_ids = ['line_graph_example']
+            plot_ids = ['0a0a78fc8d65']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -432,8 +432,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 x_val = int((box_points[2][0] + box_points[3][0]) / 2)
             else:
                 # rotated tick label
-                midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
-                x_val = int(box_points[1][0] + midpoint)
+                x_val = int(box_points[1][0])   # upper right box point
             if (line_plot_mask[:, x_val] == 0).all():
                 # mask is missing here. find nearest point
                 mask_vals = torch.where(line_plot_mask)
@@ -480,8 +479,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         tick_pt = center[1]
                 else:
                     # rotated tick label
-                    midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
-                    tick_pt = box_points[1][0] + midpoint
+                    tick_pt = box_points[1][0]  # upper right box point
 
                 axes[axis].append({
                     'tick_id': tick_id,
