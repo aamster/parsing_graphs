@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 from pathlib import Path
 from typing import List, Dict, Literal, Optional
@@ -7,7 +6,7 @@ from typing import List, Dict, Literal, Optional
 import cv2
 import numpy as np
 import torch.utils.data
-import torchvision
+import torchvision.transforms
 from sklearn.cluster import KMeans
 from torch import Tensor
 from torch.utils.data.dataset import T_co
@@ -17,8 +16,7 @@ torchvision.disable_beta_transforms_warning()
 from torchvision import datapoints, io
 from torchvision.utils import draw_keypoints
 
-from torchvision.transforms.v2 import functional as F
-
+from torchvision.transforms.v2 import functional as F, Compose
 
 from parse_plots.utils import string_to_float, resize_plot_bounding_box
 
@@ -151,7 +149,12 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
                 plot_bounding_box=plot_bb
             )
             if self._transform is not None:
-                img = self._transform(id)(img)
+                if isinstance(self._transform, Compose):
+                    img = self._transform(img)
+                else:
+                    # We pass the id to see if we need to rotate
+                    # the horizontal bar
+                    img = self._transform(id)(img)
 
             return img, {
                 'image_id': id,
