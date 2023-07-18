@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 plot_expected_type_map = {
     'vertical_bar': {
-        'x-axis': ['categorical', 'numeric'],
+        'x-axis': ['categorical'],
         'y-axis': 'numeric'
     },
     'horizontal_bar': {
@@ -377,7 +377,7 @@ class DetectText:
         center, size, angle = cv2.minAreaRect(contour)
         x, y, w, h = cv2.boundingRect(contour)
         #     print(w, h)
-        if h > 2 * w:
+        if h > 1.5 * w:
             if angle == 90:
                 # probably vertical text and angle should be 0
                 angle = 0
