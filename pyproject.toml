@@ -27,7 +27,8 @@ dependencies = [
     "boto3",
     "pytesseract",
     "scikit-learn",
-    "easyocr"
+    "easyocr",
+    "argschema"
 ]
 
 [tool.setuptools.packages.find]
