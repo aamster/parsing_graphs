@@ -147,12 +147,20 @@ class DetectText:
                 for axis in ('x-axis', 'y-axis')}
         return res
 
-    @staticmethod
     def _postprocess_text(
+        self,
         axis_text,
         axis,
         plot_type
     ):
+        def is_numeric(x):
+            try:
+                float(x)
+                is_float = True
+            except ValueError:
+                is_float = False
+            return is_float
+
         expected_type = plot_expected_type_map[plot_type][axis]
         if expected_type == 'numeric' or 'numeric' in expected_type:
             axis_text = [try_convert_numeric(x=x) for x in axis_text]
@@ -184,15 +192,9 @@ class DetectText:
                         axis_text[i] if i in numeric_text_idx else preds[i]
                         for i in range(len(axis_text))]
 
-                    # TODO there's too many edge cases to get this right.
-                    # maybe better to just finetune ocr model
-                    # try:
-                    #     axis_text = self._correct_numeric_sequence(axis=axis_text)
-                    # except Exception as e:
-                    #     logger.error(e)
-                    #     axis_text = np.array(axis_text)
-                    #     axis_text[np.isnan(axis_text)] = 0
-                    #     axis_text = axis_text.tolist()
+        if all(is_numeric(x) for x in axis_text):
+            axis_text = self._correct_numeric_sequence(axis=axis_text)
+
         if expected_type == 'categorical' or 'categorical' in expected_type:
             # make sure all string and no numbers
             mode = Counter([type(x) for x in axis_text]).most_common(n=1)[0][0]
@@ -394,17 +396,20 @@ class DetectText:
         2. Assume that numbers should be evenly spaced, create sequence with
             that diff
         """
-        axis = np.array(axis)
-        diff = pd.Series(axis).diff()
+        axis_float = np.array([float(x) for x in axis])
+        diff = pd.Series(axis_float).diff()
         expected_diff = diff.mode().iloc[0]
 
-        start = axis[np.where(diff == expected_diff)[0][0]] - expected_diff * \
+        start = axis_float[np.where(diff == expected_diff)[0][0]] - expected_diff * \
                 np.where(diff == expected_diff)[0][0]
-        end = axis[np.where(diff == expected_diff)[0][0]] + expected_diff * (
-                    len(axis) - np.where(diff == expected_diff)[0][0])
+        end = axis_float[np.where(diff == expected_diff)[0][0]] + expected_diff * (
+                    len(axis_float) - np.where(diff == expected_diff)[0][0])
         interpolated = np.arange(start, end, expected_diff)
-        if (axis[~np.isnan(axis)].astype('int') == axis[~np.isnan(axis)]).all():
+        if (axis_float[~np.isnan(axis_float)].astype('int') == axis_float[~np.isnan(axis_float)]).all():
             interpolated = interpolated.astype('int')
+
+        if str(axis[0]) == axis[0]:
+            interpolated = np.array([str(x) for x in interpolated])
         return interpolated.tolist()
 
 
