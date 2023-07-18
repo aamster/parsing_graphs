@@ -67,7 +67,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:256]
-            plot_ids = ['0a0a78fc8d65']
+            plot_ids = ['histogram_example']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -301,8 +301,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     ]
 
             if plot_types[file_id] == 'vertical_bar' and \
-                    len(plot_points) > 0 and \
-                    isinstance(plot_points[0][0], float):
+                    len(tick_labels[file_id]['x-axis']) == \
+                    len(plot_points) + 1:
                 # it's a histogram
                 plot_points = list(zip(
                     tick_labels[file_id]['x-axis'],
@@ -432,7 +432,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 x_val = int((box_points[2][0] + box_points[3][0]) / 2)
             else:
                 # rotated tick label
-                x_val = int(box_points[1][0])   # upper right box point
+                midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
+                x_val = int(box_points[1][0] + midpoint)
             if (line_plot_mask[:, x_val] == 0).all():
                 # mask is missing here. find nearest point
                 mask_vals = torch.where(line_plot_mask)
@@ -479,7 +480,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         tick_pt = center[1]
                 else:
                     # rotated tick label
-                    tick_pt = box_points[1][0]  # upper right box point
+                    midpoint = ((box_points[2][0] - box_points[1][0]) / 2)
+                    tick_pt = box_points[1][0] + midpoint
 
                 axes[axis].append({
                     'tick_id': tick_id,
