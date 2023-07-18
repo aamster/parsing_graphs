@@ -66,8 +66,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            #plot_ids = plot_ids[:256]
-            plot_ids = ['histogram_example']
+            plot_ids = plot_ids[:256]
+            #plot_ids = ['1934f19f58a6']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -75,14 +75,18 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 checkpoint_path=self.args['line_plot_segmentation_checkpoint'],
                 learning_rate=1e-3,
                 model=Unet(classes=1),
-                hyperparams={}
+                hyperparams={},
+                map_location=(
+                    torch.device('cpu') if not torch.has_cuda else None)
             )
         self._detect_plot_values_model = \
             DetectPlotValuesModel.load_from_checkpoint(
                 checkpoint_path=self.args['plot_object_detector_checkpoint'],
                 learning_rate=1e-3,
                 model=self.detect_plot_values_model,
-                hyperparams={}
+                hyperparams={},
+                map_location=(
+                    torch.device('cpu') if not torch.has_cuda else None)
             )
 
     @property
