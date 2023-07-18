@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -11,7 +12,6 @@ import torchvision
 from PIL import Image
 from easyocr.recognition import get_text
 from easyocr.utils import get_image_list, reformat_input
-from scipy import stats
 from sklearn.linear_model import LinearRegression
 
 torchvision.disable_beta_transforms_warning()
@@ -195,8 +195,7 @@ class DetectText:
                     #     axis_text = axis_text.tolist()
         if expected_type == 'categorical' or 'categorical' in expected_type:
             # make sure all string and no numbers
-            types = np.array([type(x) for x in axis_text])
-            mode = stats.mode(types).mode[0]
+            mode = Counter([type(x) for x in axis_text]).most_common(n=1)[0][0]
             axis_text = [x if isinstance(x, mode) else mode(x)
                          for x in axis_text]
         return axis_text
