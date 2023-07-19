@@ -196,7 +196,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
                 return False
 
         for label in (1, 2):
-            label_idx = np.where(pred['labels'] == label)[0]
+            label_idx = torch.where(pred['labels'] == label)[0]
             boxes = pred['boxes'][label_idx]
             overlap = [
                 does_box_overlap(
