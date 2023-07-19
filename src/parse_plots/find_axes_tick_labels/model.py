@@ -163,14 +163,14 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             if axis == 'x-axis':
                 box1, box2 = [box_y1, box_y2]
                 other1, other2 = [
-                    np.quantile([x[1] for x in other_boxes], 0.5),
-                    np.quantile([x[3] for x in other_boxes], 0.5)
+                    torch.quantile(other_boxes[:, 1], 0.5).item(),
+                    torch.quantile(other_boxes[:, 3], 0.5).item()
                 ]
             else:
                 box1, box2 = [box_x1, box_x2]
                 other1, other2 = [
-                    np.quantile([x[0] for x in other_boxes], 0.5),
-                    np.quantile([x[2] for x in other_boxes], 0.5)
+                    torch.quantile(other_boxes[:, 0], 0.5).item(),
+                    torch.quantile(other_boxes[:, 2], 0.5).item()
                 ]
 
             #   ---------
