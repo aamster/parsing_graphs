@@ -2,7 +2,6 @@ from contextlib import contextmanager
 from typing import Dict, Any
 
 import lightning
-import numpy as np
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 

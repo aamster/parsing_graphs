@@ -655,8 +655,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return predictions
 
     def _find_axes_tick_labels(self) -> Dict:
-        weights = MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-        model = maskrcnn_resnet50_fpn_v2(weights=weights)
+        model = maskrcnn_resnet50_fpn_v2(weights=None)
 
         # replace box classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
