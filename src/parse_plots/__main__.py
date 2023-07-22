@@ -74,7 +74,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             SegmentLinePlotModel.load_from_checkpoint(
                 checkpoint_path=self.args['line_plot_segmentation_checkpoint'],
                 learning_rate=1e-3,
-                model=Unet(classes=1),
+                model=Unet(classes=1, pretrained=False),
                 hyperparams={},
                 map_location=(
                     torch.device('cpu') if not torch.has_cuda else None)
@@ -91,7 +91,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     @property
     def detect_plot_values_model(self):
-        model = fasterrcnn_resnet50_fpn_v2()
+        model = fasterrcnn_resnet50_fpn_v2(weights=None)
 
         # replace box classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
