@@ -65,7 +65,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:256]
+            plot_ids = plot_ids[:10]
             #plot_ids = ['1934f19f58a6']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
@@ -87,6 +87,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 map_location=(
                     torch.device('cpu') if not torch.has_cuda else None)
             )
+        self._classify_plot_type_model = self.classify_plot_type_model
+        self._detect_axes_labels_model = self.detect_axes_labels_model
+        self._trainer = Trainer()
 
     @property
     def detect_plot_values_model(self):
@@ -97,19 +100,74 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 6)
         return model
 
-    def run(self):
-        pd.DataFrame({
-            'id': ['000b92c3b098_x', '000b92c3b098_y', '007a18eb4e09_x', '007a18eb4e09_y', '00dcf883a459_x', '00dcf883a459_y', '00f5404753cf_x', '00f5404753cf_y', '01b45b831589_x', '01b45b831589_y'],
-            'data_series': ['abc;def', '0.0;1.0'] * 5,
-            'chart_type': ['vertical_bar', 'vertical_bar'] * 5
-        }).to_csv(Path(self.args['out_dir']) / 'submission.csv', index=False)
-        return
+    @property
+    def classify_plot_type_model(self):
+        architecture = efficientnet_b1()
 
+        architecture.classifier = nn.Sequential(
+            nn.Dropout(0.2, inplace=True),
+            nn.Linear(1280, 5)
+        )
+
+        model: ClassifyPlotTypeModel = \
+            ClassifyPlotTypeModel.load_from_checkpoint(
+                checkpoint_path=self.args['classify_plot_type_checkpoint'],
+                learning_rate=1e-3,
+                model=architecture,
+                hyperparams={},
+                map_location=(torch.device('cpu') if not torch.has_cuda
+                              else None)
+            )
+        return model
+
+    @property
+    def detect_axes_labels_model(self):
+        model = maskrcnn_resnet50_fpn_v2(weights=None)
+
+        # replace box classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 3)
+
+        # replace mask classifier
+        in_features_mask = model.roi_heads.mask_predictor.conv5_mask\
+            .in_channels
+        hidden_layer = 256
+        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
+                                                           hidden_layer,
+                                                           3)
+        model: SegmentAxesTickLabelsModel = \
+            SegmentAxesTickLabelsModel.load_from_checkpoint(
+                checkpoint_path=(
+                    self.args['segment_axes_tick_labels_checkpoint']),
+                learning_rate=1e-3,
+                model=model,
+                hyperparams={},
+                map_location=(torch.device('cpu') if not torch.has_cuda
+                              else None)
+        )
+        return model
+
+    def run(self):
         all_data_series = []
         all_axes_segmentations = self._find_axes_tick_labels()
         n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
         for batch_idx, axes_segmentations in enumerate(all_axes_segmentations,
                                                        start=1):
+            ##########
+            # DEBUG
+            ##########
+            data_series = self._construct_data_series(
+                plot_types={k: 'vertical_bar' for k in axes_segmentations},
+                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+                                         for k in axes_segmentations}
+            )
+            data_series = pd.DataFrame(data_series)
+            all_data_series.append(data_series)
+            continue
+            ##########
+            # END DEBUG
+            ##########
+
             start = time.time()
             self.logger.info(
                 f'{batch_idx}/{n_batches} Getting plot values for '
@@ -551,8 +609,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             collate_func=collate_func,
             **data_module_kwargs
         )
-        trainer = Trainer()
-        predictions = trainer.predict(
+        predictions = self._trainer.predict(
             model=model,
             datamodule=data_module
         )
@@ -632,26 +689,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             num_workers=os.cpu_count(),
             shuffle=False
         )
-        architecture = efficientnet_b1()
-
-        architecture.classifier = nn.Sequential(
-            nn.Dropout(0.2, inplace=True),
-            nn.Linear(1280, 5)
-        )
-
-        model: ClassifyPlotTypeModel = \
-            ClassifyPlotTypeModel.load_from_checkpoint(
-                checkpoint_path=self.args['classify_plot_type_checkpoint'],
-                learning_rate=1e-3,
-                model=architecture,
-                hyperparams={},
-                map_location=(torch.device('cpu') if not torch.has_cuda
-                              else None)
-            )
-
-        trainer = Trainer()
-        predictions = trainer.predict(
-            model=model,
+        predictions = self._trainer.predict(
+            model=self._classify_plot_type_model,
             dataloaders=data_loader
         )
         predictions = np.concatenate(predictions)
@@ -660,29 +699,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return predictions
 
     def _find_axes_tick_labels(self) -> Dict:
-        model = maskrcnn_resnet50_fpn_v2(weights=None)
-
-        # replace box classifier
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 3)
-
-        # replace mask classifier
-        in_features_mask = model.roi_heads.mask_predictor.conv5_mask\
-            .in_channels
-        hidden_layer = 256
-        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
-                                                           hidden_layer,
-                                                           3)
-        model: SegmentAxesTickLabelsModel = \
-            SegmentAxesTickLabelsModel.load_from_checkpoint(
-                checkpoint_path=self.args['segment_axes_tick_labels_checkpoint'],
-                learning_rate=1e-3,
-                model=model,
-                hyperparams={},
-                map_location=(torch.device('cpu') if not torch.has_cuda
-                              else None)
-        )
-
         batch_size = self.args['batch_size']
         for start in torch.arange(0, len(self._plot_ids), batch_size):
             data_module = PlotDataModule(
@@ -698,10 +714,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 ]),
                 is_train=False
             )
-            trainer = Trainer()
 
-            predictions = trainer.predict(
-                model=model,
+            predictions = self._trainer.predict(
+                model=self._detect_axes_labels_model,
                 datamodule=data_module
             )
 
