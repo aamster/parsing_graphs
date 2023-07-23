@@ -99,9 +99,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     def run(self):
         pd.DataFrame({
-            'id': ['1_x', '1_y', '2_x', '2_y'],
-            'data_series': ['1;2', '3;4', '1;2', '3;4'],
-            'chart_type': ['vertical_bar', 'vertical_bar', 'vertical_bar', 'vertical_bar']
+            'id': ['000b92c3b098_x', '000b92c3b098_y', '007a18eb4e09_x', '007a18eb4e09_y', '00dcf883a459_x', '00dcf883a459_y', '00f5404753cf_x', '00f5404753cf_y', '01b45b831589_x', '01b45b831589_y'],
+            'data_series': ['abc;def', '0.0;1.0'] * 5,
+            'chart_type': ['vertical_bar', 'vertical_bar'] * 5
         }).to_csv(Path(self.args['out_dir']) / 'submission.csv', index=False)
         return
 
