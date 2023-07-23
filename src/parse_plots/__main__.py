@@ -28,8 +28,7 @@ torchvision.disable_beta_transforms_warning()
 
 import torchvision.transforms.v2 as T
 import torchvision.transforms.functional as F_transforms
-from torchvision.models.detection import MaskRCNN_ResNet50_FPN_V2_Weights, \
-    maskrcnn_resnet50_fpn_v2
+from torchvision.models.detection import maskrcnn_resnet50_fpn_v2
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, \
     fasterrcnn_resnet50_fpn_v2
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
@@ -99,6 +98,12 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return model
 
     def run(self):
+        pd.DataFrame({
+            'id': ['1_x', '1_y', '2_x', '2_y'],
+            'data_series': ['1;2', '3;4', '1;2', '3;4'],
+            'chart_type': ['vertical_bar', 'vertical_bar', 'vertical_bar', 'vertical_bar']
+        }).to_csv(Path(self.args['out_dir']) / 'submission.csv', index=False)
+        return
 
         all_data_series = []
         all_axes_segmentations = self._find_axes_tick_labels()
