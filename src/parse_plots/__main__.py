@@ -148,21 +148,21 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return model
 
     def run(self):
-        ##########
-        # DEBUG
-        ##########
-        data_series = self._construct_data_series(
-            plot_types={k: 'vertical_bar' for k in self._plot_ids},
-            file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                     for k in self._plot_ids}
-        )
-        data_series = pd.DataFrame(data_series)
-        out_path = Path(self.args['out_dir']) / 'submission.csv'
-        data_series.to_csv(out_path, index=False)
-        return
-        ##########
-        # END DEBUG
-        ##########
+        # ##########
+        # # DEBUG
+        # ##########
+        # data_series = self._construct_data_series(
+        #     plot_types={k: 'vertical_bar' for k in self._plot_ids},
+        #     file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+        #                              for k in self._plot_ids}
+        # )
+        # data_series = pd.DataFrame(data_series)
+        # out_path = Path(self.args['out_dir']) / 'submission.csv'
+        # data_series.to_csv(out_path, index=False)
+        # return
+        # ##########
+        # # END DEBUG
+        # ##########
         all_data_series = []
         all_axes_segmentations = self._find_axes_tick_labels()
         n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
