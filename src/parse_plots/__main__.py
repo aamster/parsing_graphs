@@ -730,11 +730,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 is_train=False
             )
 
-            predictions = self._trainer.predict(
-                model=self._detect_axes_labels_model,
-                datamodule=data_module
-            )
-
             ##########
             # DEBUG
             ##########
@@ -743,7 +738,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             # END DEBUG
             ##########
 
-            yield predictions[0]
+            # predictions = self._trainer.predict(
+            #     model=self._detect_axes_labels_model,
+            #     datamodule=data_module
+            # )
+            # yield predictions[0]
 
     def _detect_axes_label_text(
         self,
