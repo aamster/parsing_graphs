@@ -48,8 +48,9 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         self._is_train = is_train
 
     def __getitem__(self, index) -> T_co:
-        id = Path(self._plot_files[index]).stem
-        img = io.read_image(str(self._plots_dir / f'{id}.jpg'))
+        plot_file = self._plot_files[index]
+        id = Path(plot_file).stem
+        img = io.read_image(str(self._plots_dir / plot_file))
         img = datapoints.Image(img)
 
         if not self._is_train:
