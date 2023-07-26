@@ -75,6 +75,13 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
     ):
         img, target = batch
         preds = self._get_predictions(batch=batch)
+        ###########
+        # DEBUG
+        ###########
+        return
+        ###########
+        # END DEBUG
+        ###########
 
         sorted_preds = {}
         for pred_idx in range(len(preds)):
