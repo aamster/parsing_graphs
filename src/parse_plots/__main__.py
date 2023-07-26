@@ -733,16 +733,16 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             ##########
             # DEBUG
             ##########
-            yield {k: [] for k in self._plot_ids[start:start+batch_size]}
+            #yield {k: [] for k in self._plot_ids[start:start+batch_size]}
             ##########
             # END DEBUG
             ##########
 
-            # predictions = self._trainer.predict(
-            #     model=self._detect_axes_labels_model,
-            #     datamodule=data_module
-            # )
-            # yield predictions[0]
+            predictions = self._trainer.predict(
+                model=self._detect_axes_labels_model,
+                datamodule=data_module
+            )
+            yield predictions[0]
 
     def _detect_axes_label_text(
         self,
