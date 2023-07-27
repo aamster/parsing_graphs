@@ -53,6 +53,14 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         img = io.read_image(str(self._plots_dir / plot_file))
         img = datapoints.Image(img)
 
+        ##########
+        # DEBUG
+        ##########
+        return None, None
+        ##########
+        # END DEBUG
+        ##########
+
         if not self._is_train:
             if self._transform is not None:
                 img = self._transform(img)
