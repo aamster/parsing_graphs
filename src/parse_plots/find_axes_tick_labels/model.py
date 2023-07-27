@@ -75,6 +75,14 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         img, target = batch
+        ###########
+        # DEBUG
+        ###########
+        return
+        ###########
+        # END DEBUG
+        ###########
+        
         preds = self._get_predictions(batch=batch)
         ###########
         # DEBUG
