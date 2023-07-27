@@ -44,6 +44,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
 
     def training_step(self, batch, batch_idx):
         data, target = batch
+        self.model.train()
         losses = self.model(data, target)
 
         # sums the classification and regression losses for both the
@@ -122,11 +123,18 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         return sorted_preds
 
     def _get_predictions(self, batch):
-        with evaluate(model=self.model):
-            with torch.no_grad():
-                data, _ = batch
-                preds = self.model(data)
+        self.model.eval()
+        with torch.no_grad():
+            data, _ = batch
+            preds = self.model(data)
 
+        #########
+        # DEBUG
+        #########
+        return
+        #########
+        # END DEBUG
+        #########
         preds = threshold_soft_masks(preds=preds)
 
         return preds
