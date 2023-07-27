@@ -56,7 +56,7 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         ##########
         # DEBUG
         ##########
-        return [], []
+        #return [], []
         ##########
         # END DEBUG
         ##########
