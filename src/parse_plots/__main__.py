@@ -725,7 +725,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 inference_transform=T.Compose([
                     T.ToImageTensor(),
                     T.ConvertImageDtype(torch.float32),
-                    #T.Resize([448, 448], antialias=True)
+                    T.Resize([448, 448], antialias=True)
                 ]),
                 is_train=False,
                 collate_func=lambda batch: tuple(zip(*batch))
