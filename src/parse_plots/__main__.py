@@ -727,7 +727,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     #T.ConvertImageDtype(torch.float32),
                     #T.Resize([448, 448], antialias=True)
                 ]),
-                is_train=False
+                is_train=False,
+                collate_func=lambda batch: tuple(zip(*batch))
             )
 
             predictions = self._trainer.predict(
