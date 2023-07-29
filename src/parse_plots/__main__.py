@@ -724,8 +724,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 plot_ids=self._plot_ids[start:start+batch_size],
                 inference_transform=T.Compose([
                     T.ToImageTensor(),
-                    T.ConvertImageDtype(torch.float32),
-                    T.Resize([448, 448], antialias=True)
+                    #T.ConvertImageDtype(torch.float32),
+                    #T.Resize([448, 448], antialias=True)
                 ]),
                 is_train=False
             )
