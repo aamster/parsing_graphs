@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Tuple, List, Any
 
+import albumentations
 import argschema as argschema
 import cv2
 import easyocr
@@ -723,9 +724,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 num_workers=0 if self._is_debug else os.cpu_count(),
                 plot_ids=self._plot_ids[start:start+batch_size],
                 inference_transform=T.Compose([
+                    lambda x: albumentations.Resize(height=448, width=448)(image=x)['image'],
                     T.ToImageTensor(),
-                    T.ConvertImageDtype(torch.float32),
-                    T.Resize([448, 448], antialias=True)
+                    T.ConvertImageDtype(torch.float32)
                 ]),
                 is_train=False,
                 #collate_func=lambda batch: tuple(zip(*batch))

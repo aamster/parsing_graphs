@@ -11,7 +11,7 @@ from torch.utils.data.dataset import T_co
 
 torchvision.disable_beta_transforms_warning()
 
-from torchvision import datapoints, io
+from torchvision import datapoints
 from torchvision.transforms.v2 import functional as F
 
 
@@ -50,9 +50,8 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
     def __getitem__(self, index) -> T_co:
         plot_file = self._plot_files[index]
         id = Path(plot_file).stem
-        img = io.read_image(str(self._plots_dir / plot_file))
-        img = datapoints.Image(img)
-
+        img = cv2.imread(str(self._plots_dir / plot_file))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         ##########
         # DEBUG
         ##########

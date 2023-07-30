@@ -29,7 +29,8 @@ dependencies = [
     "scikit-learn",
     "easyocr",
     "argschema",
-    "backboned-unet @ git+https://github.com/mkisantal/backboned-unet.git@8e60ce62481c56eacf4a1441c376bb580da41bc5"
+    "backboned-unet @ git+https://github.com/mkisantal/backboned-unet.git@8e60ce62481c56eacf4a1441c376bb580da41bc5",
+    "albumentations"
 ]
 
 [tool.setuptools.packages.find]
