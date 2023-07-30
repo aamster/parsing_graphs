@@ -75,22 +75,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         img, target = batch
-        ###########
-        # DEBUG
-        ###########
-        return
-        ###########
-        # END DEBUG
-        ###########
-        
         preds = self._get_predictions(batch=batch)
-        ###########
-        # DEBUG
-        ###########
-        return
-        ###########
-        # END DEBUG
-        ###########
 
         sorted_preds = {}
         for pred_idx in range(len(preds)):
@@ -136,13 +121,6 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             data, _ = batch
             preds = self.model(data)
 
-        #########
-        # DEBUG
-        #########
-        return
-        #########
-        # END DEBUG
-        #########
         preds = threshold_soft_masks(preds=preds)
 
         return preds

@@ -149,41 +149,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return model
 
     def run(self):
-        # ##########
-        # # DEBUG
-        # ##########
-        # data_series = self._construct_data_series(
-        #     plot_types={k: 'vertical_bar' for k in self._plot_ids},
-        #     file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-        #                              for k in self._plot_ids}
-        # )
-        # data_series = pd.DataFrame(data_series)
-        # out_path = Path(self.args['out_dir']) / 'submission.csv'
-        # data_series.to_csv(out_path, index=False)
-        # return
-        # ##########
-        # # END DEBUG
-        # ##########
         all_data_series = []
         all_axes_segmentations = self._find_axes_tick_labels()
         n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
         for batch_idx, axes_segmentations in enumerate(all_axes_segmentations,
                                                        start=1):
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
-
             start = time.time()
             self.logger.info(
                 f'{batch_idx}/{n_batches} Getting plot values for '
@@ -724,26 +694,19 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 num_workers=0 if self._is_debug else os.cpu_count(),
                 plot_ids=self._plot_ids[start:start+batch_size],
                 inference_transform=T.Compose([
-                    lambda x: albumentations.Resize(height=448, width=448)(image=x)['image'],
+                    lambda x: albumentations.Resize(height=448, width=448)(
+                        image=x)['image'],
                     T.ToImageTensor(),
                     T.ConvertImageDtype(torch.float32)
                 ]),
-                is_train=False,
-                #collate_func=lambda batch: tuple(zip(*batch))
+                is_train=False
             )
 
             predictions = self._trainer.predict(
                 model=self._detect_axes_labels_model,
                 datamodule=data_module
             )
-            ##########
-            # DEBUG
-            ##########
-            yield {k: [] for k in self._plot_ids[start:start+batch_size]}
-            ##########
-            # END DEBUG
-            ##########
-            #yield predictions[0]
+            yield predictions[0]
 
     def _detect_axes_label_text(
         self,

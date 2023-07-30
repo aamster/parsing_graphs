@@ -52,13 +52,6 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
         id = Path(plot_file).stem
         img = cv2.imread(str(self._plots_dir / plot_file))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        ##########
-        # DEBUG
-        ##########
-        #return [], []
-        ##########
-        # END DEBUG
-        ##########
 
         if not self._is_train:
             if self._transform is not None:
