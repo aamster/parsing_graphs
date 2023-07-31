@@ -16,7 +16,7 @@ from sklearn.linear_model import LinearRegression
 
 torchvision.disable_beta_transforms_warning()
 
-from torchvision import datapoints
+from torchvision import datapoints, io
 import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
 from tqdm import tqdm
@@ -114,7 +114,7 @@ class DetectText:
         for file_id, pred in tqdm(axes_segmentations.items()):
             axis_text = {}
 
-            img = Image.open(f'{self._images_dir / file_id}.jpg')
+            img = io.read_image(f'{self._images_dir / file_id}.jpg')
             img = datapoints.Image(img)
 
             for axis, axis_pred in pred.items():
@@ -255,37 +255,12 @@ class DetectText:
         mask: torch.tensor
     ) -> np.array:
         img = self._rotate_cropped_text(img=img, mask=mask)
-
-        def invert_background(img):
-            """tesseract does poorly when bg is not white.
-            inverts img so that the background is white"""
-            return np.array(TF.invert(Image.fromarray(img)))
-
-        # found by taking small sample of imgs with white bg
-        white_bg_mean = 225.19422039776728
-        white_bg_std = 4.534304556306066
-
-        z_score = (img.mean() - white_bg_mean) / white_bg_std
-        if abs(z_score) > 6:
-            #         print(img.mean())
-            #         print('inverting')
-            #         print('before...')
-            #         plt.imshow(img)
-            #         plt.show()
-            img = invert_background(img)
         return img
 
     def _get_text(
         self,
         imgs: List[np.array]
     ):
-        #     plt.imshow(img)
-        #     plt.show()
-
-        #result = pytesseract.image_to_string(img, config='--psm 6')
-        # TODO recognize gives bad results
-        # manually preprocess, and give it to get_text
-
         preprocessed_images = []
         max_widths = []
         for img in imgs:
@@ -301,8 +276,8 @@ class DetectText:
 
         results = get_text(
             character=self._easyocr_reader.character,
-            imgH=64,
-            imgW=int(max(max_widths)),
+            imgH=32,
+            imgW=100,
             recognizer=self._easyocr_reader.recognizer,
             converter=self._easyocr_reader.converter,
             image_list=preprocessed_images,
@@ -311,15 +286,6 @@ class DetectText:
             workers=0
         )
         results = [item[1] for item in results]
-        # results = self._easyocr_reader.recognize(
-        #     img,
-        #     free_list=oriented_bboxes,
-        #     horizontal_list=[],
-        #     batch_size=64,
-        #     detail=0
-        # )
-        # for i in range(len(results)):
-        #     results[i][1] = results[i][1].strip()
         return results
 
     @staticmethod

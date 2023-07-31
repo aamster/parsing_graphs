@@ -2,6 +2,7 @@ import re
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision
 torchvision.disable_beta_transforms_warning()
@@ -76,7 +77,7 @@ def convert_to_tensor(target):
 
 
 def resize_plot_bounding_box(
-    img: torch.tensor,
+    img: np.array,
     plot_bounding_box: Dict
 ):
     """Plot bounding box for inference obtained using a 448x448 image
@@ -92,7 +93,7 @@ def resize_plot_bounding_box(
         format=datapoints.BoundingBoxFormat.XYXY,
         spatial_size=(448, 448)
     )
-    bboxes = T.Resize(F.get_spatial_size(img))(bboxes)
+    bboxes = T.Resize(img.shape[:-1])(bboxes)
     bbox = bboxes[0]
     x0, y0, x1, y1 = bbox.int().numpy()
     return {

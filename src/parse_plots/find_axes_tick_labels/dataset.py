@@ -55,7 +55,7 @@ class FindAxesTickLabelsDataset(torch.utils.data.Dataset):
 
         if not self._is_train:
             if self._transform is not None:
-                img = self._transform(img)
+                img = self._transform(image=img)['image']
             return img, {'image_id': id}
 
         with open(self._annotations_dir / f'{id}.json') as f:

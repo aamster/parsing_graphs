@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torchvision
+from albumentations.pytorch import ToTensorV2
 from backboned_unet import Unet
 from lightning import Trainer, LightningModule
 from torchvision.models.segmentation import FCN_ResNet50_Weights
@@ -28,12 +29,10 @@ from torchvision.models import efficientnet_b1
 torchvision.disable_beta_transforms_warning()
 
 import torchvision.transforms.v2 as T
-import torchvision.transforms.functional as F_transforms
 from torchvision.models.detection import maskrcnn_resnet50_fpn_v2
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, \
     fasterrcnn_resnet50_fpn_v2
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
-from torchvision.transforms import InterpolationMode
 
 from parse_plots.classify_plot_type.dataset import ClassifyPlotTypeDataset
 from parse_plots.classify_plot_type.model import ClassifyPlotTypeModel
@@ -54,6 +53,7 @@ class ParsePlotsSchema(argschema.ArgSchema):
     out_dir = argschema.fields.OutputDir(required=True)
     is_debug = argschema.fields.Boolean(default=False)
     batch_size = argschema.fields.Int(default=8)
+    debug_num = argschema.fields.Int(default=256, required=False)
 
 
 class ParsePlotsRunner(argschema.ArgSchemaParser):
@@ -66,8 +66,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:10]
-            #plot_ids = ['1934f19f58a6']
+            plot_ids = plot_ids[:self.args['debug_num']]
+            #plot_ids = ['00dcf883a459']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -561,22 +561,29 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         if isinstance(model, DetectPlotValuesModel):
 
             def transform(image_id):
-                return T.Compose([
-                    T.ToImageTensor(),
-                    T.ConvertImageDtype(torch.float32),
-                    T.Resize([448, 448]),
-                    lambda img: (
-                        F_transforms.rotate(img=img, angle=90)
-                        if plot_types[image_id] == 'horizontal_bar' else img)
-                ])
+                if plot_types[image_id] == 'horizontal_bar':
+                    # Rotating horizontal bar since underrepresented in data
+                    # model does better if bars vertical
+                    return albumentations.Compose([
+                        albumentations.Resize(height=448, width=448),
+                        albumentations.Rotate(limit=(90, 90),
+                                              interpolation=cv2.INTER_NEAREST),
+                        albumentations.Normalize(mean=0, std=1),
+                        ToTensorV2()
+                    ])
+                else:
+                    return albumentations.Compose([
+                        albumentations.Resize(height=448, width=448),
+                        albumentations.Normalize(mean=0, std=1),
+                        ToTensorV2()
+                    ])
         else:
-            transform = T.Compose([
-                T.ToImageTensor(),
-                T.ConvertImageDtype(torch.float32),
-                T.Resize([256, 256]),
-                T.Normalize(
+            transform = albumentations.Compose([
+                albumentations.Resize(height=256, width=256),
+                albumentations.Normalize(
                     mean=FCN_ResNet50_Weights.DEFAULT.transforms().mean,
-                    std=FCN_ResNet50_Weights.DEFAULT.transforms().std)
+                    std=FCN_ResNet50_Weights.DEFAULT.transforms().std),
+                ToTensorV2()
             ])
 
         def collate_func(batch):
@@ -644,18 +651,13 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         return bounding_boxes
 
     def _classify_plot_type(self, axes_segmentations: Dict) -> Dict[str, str]:
-        transforms = T.Compose([
-            T.ToImageTensor(),
-            T.ConvertImageDtype(torch.float32),
-            T.Resize(
-                size=(256, 256),
-                interpolation=InterpolationMode.BICUBIC,
-                antialias=True
-            ),
-            T.CenterCrop(size=(240, 240)),
-            T.Normalize(
+        transforms = albumentations.Compose([
+            albumentations.Resize(height=256, width=256),
+            albumentations.CenterCrop(height=240, width=240),
+            albumentations.Normalize(
                 mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225])
+                std=[0.229, 0.224, 0.225]),
+            ToTensorV2()
         ])
 
         bounding_boxes = self._get_plot_bounding_boxes(
@@ -693,11 +695,10 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 dataset_class=FindAxesTickLabelsDataset,
                 num_workers=0 if self._is_debug else os.cpu_count(),
                 plot_ids=self._plot_ids[start:start+batch_size],
-                inference_transform=T.Compose([
-                    lambda x: albumentations.Resize(height=448, width=448)(
-                        image=x)['image'],
-                    T.ToImageTensor(),
-                    T.ConvertImageDtype(torch.float32)
+                inference_transform=albumentations.Compose([
+                    albumentations.Resize(height=448, width=448),
+                    albumentations.Normalize(mean=0, std=1),
+                    ToTensorV2()
                 ]),
                 is_train=False
             )

@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import List, Dict, Literal, Optional
 
+import albumentations
 import cv2
 import numpy as np
 import torch.utils.data
@@ -13,10 +14,10 @@ from torch.utils.data.dataset import T_co
 
 torchvision.disable_beta_transforms_warning()
 
-from torchvision import datapoints, io
+from torchvision import datapoints
 from torchvision.utils import draw_keypoints
 
-from torchvision.transforms.v2 import functional as F, Compose
+from torchvision.transforms.v2 import functional as F
 
 from parse_plots.utils import string_to_float, resize_plot_bounding_box
 
@@ -137,8 +138,8 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index) -> T_co:
         id = Path(self._plot_files[index]).stem
-        img = io.read_image(str(self._plots_dir / f'{id}.jpg'))
-        img = datapoints.Image(img)
+        img = cv2.imread(str(self._plots_dir / f'{id}.jpg'))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if not self._is_train:
             if self._plot_meta is None:
@@ -149,12 +150,12 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
                 plot_bounding_box=plot_bb
             )
             if self._transform is not None:
-                if isinstance(self._transform, Compose):
-                    img = self._transform(img)
+                if isinstance(self._transform, albumentations.Compose):
+                    img = self._transform(image=img)['image']
                 else:
                     # We pass the id to see if we need to rotate
                     # the horizontal bar
-                    img = self._transform(id)(img)
+                    img = self._transform(id)(image=img)['image']
 
             return img, {
                 'image_id': id,

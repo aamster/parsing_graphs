@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional, Dict
 
+import cv2
 import torch.utils.data
 from torch.utils.data.dataset import T_co
 from torchvision.io import read_image
@@ -54,7 +55,8 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index) -> T_co:
         id = Path(self._plot_files[index]).stem
-        data = read_image(str(self._plots_dir / f'{id}.jpg'))
+        img = cv2.imread(str(self._plots_dir / f'{id}.jpg'))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if self._is_train:
             with open(self._annotations_dir / f'{id}.json') as f:
@@ -65,7 +67,7 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         else:
             plot_bb = self._plot_meta[id]['plot_bbox']
             plot_bb = resize_plot_bounding_box(
-                img=data,
+                img=img,
                 plot_bounding_box=plot_bb
             )
             target = ''
@@ -75,14 +77,13 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         x0 = max(0, plot_bb['x0'])
 
         # Limit to the plot bounding box to exclude title/axes, etc
-        data = data[
-               :,
+        img = img[
                y0:y0 + plot_bb['height'],
                x0:x0 + plot_bb['width']]
 
-        data = self._transform(data)
+        img = self._transform(image=img)['image']
 
-        return data, target
+        return img, target
 
     def __len__(self):
         return len(self._plot_files)

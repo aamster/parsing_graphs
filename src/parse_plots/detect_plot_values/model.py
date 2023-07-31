@@ -98,7 +98,7 @@ class DetectPlotValuesModel(lightning.LightningModule):
             preds[i]['boxes'] = datapoints.BoundingBox(
                 preds[i]['boxes'],
                 format=datapoints.BoundingBoxFormat.XYXY,
-                spatial_size=batch[1][i]['image_shape'][1:]
+                spatial_size=batch[1][i]['image_shape'][:-1]
             )
 
         return preds
