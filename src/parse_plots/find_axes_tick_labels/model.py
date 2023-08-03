@@ -84,7 +84,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             preds[pred_idx]['masks'] = preds[pred_idx]['masks'][preds[pred_idx]['scores'] > 0.5]
             preds[pred_idx]['labels'] = preds[pred_idx]['labels'][preds[pred_idx]['scores'] > 0.5]
 
-            preds[pred_idx] = self._remove_outlier_box_predictions(
+            preds[pred_idx] = self.remove_outlier_box_predictions(
                 pred=preds[pred_idx]
             )
 
@@ -145,7 +145,8 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self._learning_rate)
         return optimizer
 
-    def _remove_outlier_box_predictions(self, pred: Dict):
+    @staticmethod
+    def remove_outlier_box_predictions(pred: Dict):
         """Sometimes there are stray boxes that are not axes labels.
         This tries to remove those"""
         label_int_str_map = {
@@ -158,19 +159,19 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             'labels': []
         }
 
-        def does_box_overlap(box, other_boxes, axis):
+        def does_box_overlap(box, boxes, axis):
             box_x1, box_y1, box_x2, box_y2 = box
             if axis == 'x-axis':
                 box1, box2 = [box_y1, box_y2]
                 other1, other2 = [
-                    torch.quantile(other_boxes[:, 1], 0.5).item(),
-                    torch.quantile(other_boxes[:, 3], 0.5).item()
+                    torch.quantile(boxes[:, 1], 0.5).item(),
+                    torch.quantile(boxes[:, 3], 0.5).item()
                 ]
             else:
                 box1, box2 = [box_x1, box_x2]
                 other1, other2 = [
-                    torch.quantile(other_boxes[:, 0], 0.5).item(),
-                    torch.quantile(other_boxes[:, 2], 0.5).item()
+                    torch.quantile(boxes[:, 0], 0.5).item(),
+                    torch.quantile(boxes[:, 2], 0.5).item()
                 ]
 
             #   ---------
@@ -201,7 +202,7 @@ class SegmentAxesTickLabelsModel(lightning.LightningModule):
             overlap = [
                 does_box_overlap(
                     box=boxes[i],
-                    other_boxes=boxes[[idx for idx in range(len(boxes)) if idx != i]],
+                    boxes=boxes,
                     axis=label_int_str_map[label]
                 ) for i in range(len(boxes))
             ]

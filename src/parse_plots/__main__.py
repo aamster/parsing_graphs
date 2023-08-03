@@ -3,7 +3,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Tuple, List, Any, Optional
 
 import albumentations
 import argschema as argschema
@@ -66,8 +66,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:self.args['debug_num']]
-            #plot_ids = ['00dcf883a459']
+            #plot_ids = plot_ids[:self.args['debug_num']]
+            plot_ids = ['e72dfa00d23f']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -161,6 +161,20 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             plot_types = self._classify_plot_type(
                 axes_segmentations=axes_segmentations
             )
+
+            # Fix horizontal bar axes segmentations
+            horizontal_bar_plots = {
+                k: v for k, v in plot_types.items() if v == 'horizontal_bar'}
+            if horizontal_bar_plots:
+                hb_axes_segmentations = \
+                    self._find_axes_tick_labels_for_horizontal_bar(
+                        plot_ids=[k for k in horizontal_bar_plots]
+                    )
+                for img_id in hb_axes_segmentations:
+                    axes_segmentations[img_id]['y-axis']['boxes'] = \
+                        hb_axes_segmentations[img_id]['bboxes']
+                    axes_segmentations[img_id]['y-axis']['masks'] = \
+                        hb_axes_segmentations[img_id]['masks']
 
             tick_labels = self. _detect_axes_label_text(
                 axes_segmentations=axes_segmentations,
@@ -567,7 +581,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     return albumentations.Compose([
                         albumentations.Resize(height=448, width=448),
                         albumentations.Rotate(limit=(90, 90),
-                                              interpolation=cv2.INTER_NEAREST),
+                                              p=1.0),
                         albumentations.Normalize(mean=0, std=1),
                         ToTensorV2()
                     ])
@@ -708,6 +722,66 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 datamodule=data_module
             )
             yield predictions[0]
+
+    def _find_axes_tick_labels_for_horizontal_bar(self, plot_ids) -> Dict:
+        """
+        "Fixes" horizontal bar axes labels by rotating vertically since
+        vertical bar much more represented in the data
+        We then rotate boxes/masks back to original
+
+        :param plot_ids:
+        :return:
+        """
+        data_module = PlotDataModule(
+            plots_dir=self.args['plots_dir'],
+            batch_size=self.args['batch_size'],
+            dataset_class=FindAxesTickLabelsDataset,
+            num_workers=0 if self._is_debug else os.cpu_count(),
+            plot_ids=plot_ids,
+            inference_transform=albumentations.Compose([
+                albumentations.Resize(height=448, width=448),
+                albumentations.Rotate(
+                    limit=(90, 90),
+                    p=1.0),
+                albumentations.Normalize(mean=0, std=1),
+                ToTensorV2()
+            ]),
+            is_train=False
+        )
+        predictions = self._trainer.predict(
+            model=self._detect_axes_labels_model,
+            datamodule=data_module
+        )
+        predictions = predictions[0]
+
+        d = {}
+
+        # rotate preds back
+        for image_id in predictions:
+            rotation_transform = albumentations.Compose(
+                [
+                    albumentations.Rotate(limit=(-90, -90),
+                                          p=1.0)
+                ],
+                bbox_params=albumentations.BboxParams(
+                    format='pascal_voc',
+                    label_fields=['class_labels']
+                )
+            )
+            transformed = rotation_transform(
+                image=np.zeros((448, 448)),
+                bboxes=predictions[image_id]['x-axis']['boxes'],
+                masks=[x.numpy() for x in predictions[image_id]['x-axis']['masks']],
+                class_labels=predictions[image_id]['x-axis']['labels']
+            )
+            transformed['masks'] = torch.tensor(
+                np.array(transformed['masks'])).to(
+                    predictions[image_id]['y-axis']['masks'].device)
+            transformed['bboxes'] = torch.tensor(
+                np.array(transformed['bboxes'])).to(
+                    predictions[image_id]['y-axis']['boxes'].device)
+            d[image_id] = transformed
+        return d
 
     def _detect_axes_label_text(
         self,

@@ -22,8 +22,11 @@ def normalized_levenshtein_score(y_true, y_pred):
 
 
 def score_series(y_true, y_pred):
-    if len(y_true) != len(y_pred):
-        return 0.0
+    try:
+        if len(y_true) != len(y_pred):
+            return 0.0
+    except:
+        pass
     if isinstance(y_true[0], str):
         y_pred = [str(x) for x in y_pred]
         return normalized_levenshtein_score(y_true, y_pred)
