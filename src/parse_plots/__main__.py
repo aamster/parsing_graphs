@@ -3,7 +3,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Tuple, List, Any, Optional
+from typing import Dict, Tuple, List, Any
 
 import albumentations
 import argschema as argschema
@@ -66,8 +66,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            #plot_ids = plot_ids[:self.args['debug_num']]
-            plot_ids = ['e72dfa00d23f']
+            plot_ids = plot_ids[:self.args['debug_num']]
+            #plot_ids = ['e72dfa00d23f']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
