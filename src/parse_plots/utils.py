@@ -1,6 +1,7 @@
 import re
 from typing import Dict, List
 
+import albumentations
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -88,14 +89,21 @@ def resize_plot_bounding_box(
          plot_bounding_box['x0'] + plot_bounding_box['width'],
          plot_bounding_box['y0'] + plot_bounding_box['height']]
     ])
-    bboxes = datapoints.BoundingBox(
-        bboxes,
-        format=datapoints.BoundingBoxFormat.XYXY,
-        spatial_size=(448, 448)
+    transform = albumentations.Compose(
+        [
+            albumentations.Resize(height=img.shape[0], width=img.shape[1])
+        ],
+        bbox_params=albumentations.BboxParams(
+            format='pascal_voc',
+            label_fields=['class_labels']
+        )
     )
-    bboxes = T.Resize(img.shape[:-1])(bboxes)
-    bbox = bboxes[0]
-    x0, y0, x1, y1 = bbox.int().numpy()
+    bboxes = transform(
+        image=np.zeros((448, 448)),
+        bboxes=bboxes,
+        class_labels=[0]
+    )['bboxes']
+    x0, y0, x1, y1 = [int(x) for x in bboxes[0]]
     return {
         'x0': x0,
         'y0': y0,
