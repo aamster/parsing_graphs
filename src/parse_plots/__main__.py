@@ -667,6 +667,12 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             else:
                 y1 = torch.tensor(448)
 
+            if torch.has_cuda:
+                x0 = x0.to('cuda')
+                x1 = x1.to('cuda')
+                y0 = y0.to('cuda')
+                y1 = y1.to('cuda')
+
             height = y1 - y0
             width = x1 - x0
             bounding_boxes[file_id] = {
