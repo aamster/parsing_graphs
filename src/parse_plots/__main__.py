@@ -698,10 +698,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         bounding_boxes = self._get_plot_bounding_boxes(
             axes_segmentations=axes_segmentations
         )
-        ########
-        # DEBUG
-        return
-        #######
         plot_ids = list(axes_segmentations.keys())
         dataset = ClassifyPlotTypeDataset(
             plots_dir=self.args['plots_dir'],
