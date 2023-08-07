@@ -154,6 +154,21 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
         for batch_idx, axes_segmentations in enumerate(all_axes_segmentations,
                                                        start=1):
+            ##########
+            # DEBUG
+            ##########
+            data_series = self._construct_data_series(
+                plot_types={k: 'vertical_bar' for k in axes_segmentations},
+                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+                                         for k in axes_segmentations}
+            )
+            data_series = pd.DataFrame(data_series)
+            all_data_series.append(data_series)
+            continue
+            ##########
+            # END DEBUG
+            ##########
+
             start = time.time()
             self.logger.info(
                 f'{batch_idx}/{n_batches} Getting plot values for '
