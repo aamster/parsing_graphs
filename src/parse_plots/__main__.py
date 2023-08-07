@@ -154,6 +154,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         n_batches = math.ceil(len(self._plot_ids) / self.args['batch_size'])
         for batch_idx, axes_segmentations in enumerate(all_axes_segmentations,
                                                        start=1):
+            start = time.time()
+            self.logger.info(
+                f'{batch_idx}/{n_batches} Getting plot values for '
+                f'{list(axes_segmentations.keys())}')
+            plot_types = self._classify_plot_type(
+                axes_segmentations=axes_segmentations
+            )
+
             ##########
             # DEBUG
             ##########
@@ -168,14 +176,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             ##########
             # END DEBUG
             ##########
-
-            start = time.time()
-            self.logger.info(
-                f'{batch_idx}/{n_batches} Getting plot values for '
-                f'{list(axes_segmentations.keys())}')
-            plot_types = self._classify_plot_type(
-                axes_segmentations=axes_segmentations
-            )
 
             # Fix horizontal bar axes segmentations
             horizontal_bar_plots = {
