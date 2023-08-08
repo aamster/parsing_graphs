@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 import cv2
+import numpy as np
 import torch.utils.data
 from torch.utils.data.dataset import T_co
 from torchvision.io import read_image
@@ -83,7 +84,7 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
 
         #######
         # DEBUG
-        return img, target
+        return np.zeros((448, 448, 3)), target
         #######
 
         img = self._transform(image=img)['image']
