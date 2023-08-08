@@ -59,10 +59,11 @@ class ParsePlotsSchema(argschema.ArgSchema):
 class ParsePlotsRunner(argschema.ArgSchemaParser):
     default_schema = ParsePlotsSchema
 
-    def __init__(self, input_data=None):
+    def __init__(self, input_data=None, args=None):
         super().__init__(
             schema_type=ParsePlotsSchema,
-            input_data=input_data
+            input_data=input_data,
+            args=args
         )
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
