@@ -67,6 +67,11 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
 
         else:
             plot_bb = self._plot_meta[id]['plot_bbox']
+
+            #######
+            # DEBUG
+            return np.zeros((448, 448, 3)), ''
+            #######
             plot_bb = resize_plot_bounding_box(
                 img=img,
                 plot_bounding_box=plot_bb
@@ -81,11 +86,6 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         img = img[
                y0:y0 + plot_bb['height'],
                x0:x0 + plot_bb['width']]
-
-        #######
-        # DEBUG
-        return np.zeros((448, 448, 3)), target
-        #######
 
         img = self._transform(image=img)['image']
 
