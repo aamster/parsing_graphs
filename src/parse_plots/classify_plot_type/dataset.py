@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import torch.utils.data
 from torch.utils.data.dataset import T_co
-from torchvision.io import read_image
 
 from parse_plots.utils import resize_plot_bounding_box
 
@@ -68,15 +67,15 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         else:
             plot_bb = self._plot_meta[id]['plot_bbox']
 
-            #######
-            # DEBUG
-            return np.zeros((448, 448, 3)), ''
-            #######
             plot_bb = resize_plot_bounding_box(
                 img=img,
                 plot_bounding_box=plot_bb
             )
             target = ''
+            #######
+            # DEBUG
+            return np.zeros((448, 448, 3)), ''
+            #######
 
         # Correct for negative positions
         y0 = max(0, plot_bb['y0'])
