@@ -59,9 +59,10 @@ class ParsePlotsSchema(argschema.ArgSchema):
 class ParsePlotsRunner(argschema.ArgSchemaParser):
     default_schema = ParsePlotsSchema
 
-    def __init__(self):
+    def __init__(self, input_data=None):
         super().__init__(
-            schema_type=ParsePlotsSchema
+            schema_type=ParsePlotsSchema,
+            input_data=input_data
         )
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
@@ -840,7 +841,3 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     'chart_type': plot_types[file_id]
                 })
         return res
-
-
-if __name__ == '__main__':
-    ParsePlotsRunner().run()
