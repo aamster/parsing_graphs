@@ -72,7 +72,7 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
                     img=img,
                     plot_bounding_box=plot_bb
                 )
-            except ValueError:
+            except:
                 pass
             target = ''
 
