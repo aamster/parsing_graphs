@@ -67,15 +67,14 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         else:
             plot_bb = self._plot_meta[id]['plot_bbox']
 
-            plot_bb = resize_plot_bounding_box(
-                img=img,
-                plot_bounding_box=plot_bb
-            )
+            try:
+                plot_bb = resize_plot_bounding_box(
+                    img=img,
+                    plot_bounding_box=plot_bb
+                )
+            except ValueError:
+                pass
             target = ''
-            #######
-            # DEBUG
-            return np.zeros((448, 448, 3)), ''
-            #######
 
         # Correct for negative positions
         y0 = max(0, plot_bb['y0'])
