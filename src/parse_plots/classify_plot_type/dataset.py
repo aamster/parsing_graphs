@@ -85,10 +85,6 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
                y0:y0 + plot_bb['height'],
                x0:x0 + plot_bb['width']]
 
-        #####
-        # DEBUG
-        return torch.zeros((3, 448, 448)), target
-        #####
         img = self._transform(image=img)['image']
 
         return img, target
