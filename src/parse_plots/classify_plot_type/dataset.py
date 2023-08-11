@@ -87,7 +87,7 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
 
         #####
         # DEBUG
-        return img, target
+        return torch.zeros((3, 448, 448)), target
         #####
         img = self._transform(image=img)['image']
 
