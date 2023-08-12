@@ -192,7 +192,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             ##########
             # END DEBUG
             ##########
-            
+
             tick_labels = self. _detect_axes_label_text(
                 axes_segmentations=axes_segmentations,
                 plot_types=plot_types
@@ -775,6 +775,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             model=self._detect_axes_labels_model,
             datamodule=data_module
         )
+        ######
+        # DEBUG
+        return {
+            image_id: {
+                'bboxes': [],
+                'masks': []
+            }
+            for image_id in predictions[0]}
+        ######
         predictions = predictions[0]
 
         d = {}
