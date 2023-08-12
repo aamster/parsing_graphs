@@ -64,10 +64,6 @@ class ClassifyPlotTypeModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         data, target = batch
-        ########
-        # DEBUG
-        return [1 for _ in range(data.shape[0])]
-        #######
         logits = self.model(data)
         preds = torch.argmax(logits, dim=1)
 

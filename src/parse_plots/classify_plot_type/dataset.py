@@ -85,8 +85,6 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
                y0:y0 + plot_bb['height'],
                x0:x0 + plot_bb['width']]
 
-        # Works up until here
-
         if plot_bb['height'] == 0 or plot_bb['width'] == 0:
             img_cropped = img
 
