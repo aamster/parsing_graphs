@@ -81,11 +81,16 @@ class ClassifyPlotTypeDataset(torch.utils.data.Dataset):
         x0 = max(0, plot_bb['x0'])
 
         # Limit to the plot bounding box to exclude title/axes, etc
-        img = img[
+        img_cropped = img[
                y0:y0 + plot_bb['height'],
                x0:x0 + plot_bb['width']]
 
-        img = self._transform(image=img)['image']
+        # Works up until here
+
+        if plot_bb['height'] == 0 or plot_bb['width'] == 0:
+            img_cropped = img
+
+        img = self._transform(image=img_cropped)['image']
 
         return img, target
 
