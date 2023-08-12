@@ -164,21 +164,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 axes_segmentations=axes_segmentations
             )
 
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
-
             # Fix horizontal bar axes segmentations
             horizontal_bar_plots = {
                 k: v for k, v in plot_types.items() if v == 'horizontal_bar'}
@@ -193,6 +178,21 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     axes_segmentations[img_id]['y-axis']['masks'] = \
                         hb_axes_segmentations[img_id]['masks']
 
+            ##########
+            # DEBUG
+            ##########
+            data_series = self._construct_data_series(
+                plot_types={k: 'vertical_bar' for k in axes_segmentations},
+                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+                                         for k in axes_segmentations}
+            )
+            data_series = pd.DataFrame(data_series)
+            all_data_series.append(data_series)
+            continue
+            ##########
+            # END DEBUG
+            ##########
+            
             tick_labels = self. _detect_axes_label_text(
                 axes_segmentations=axes_segmentations,
                 plot_types=plot_types
