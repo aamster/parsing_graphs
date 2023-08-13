@@ -127,15 +127,15 @@ class DetectText:
                         boxes=boxes,
                         masks=masks)
 
+                cropped_images = [
+                    self._preprocess_cropped_text(img=img, mask=mask)
+                    for mask in masks]
+
                 #######
                 # DEBUG
                 axis_text[axis] = []
                 continue
                 ########
-
-                cropped_images = [
-                    self._preprocess_cropped_text(img=img, mask=mask)
-                    for mask in masks]
 
                 if len(cropped_images) > 0:
                     text = self._get_text(imgs=cropped_images)
