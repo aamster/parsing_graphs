@@ -179,6 +179,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         axes_segmentations[img_id]['y-axis']['masks'] = \
                             hb_axes_segmentations[img_id]['masks']
 
+            tick_labels = self. _detect_axes_label_text(
+                axes_segmentations=axes_segmentations,
+                plot_types=plot_types
+            )
+
             ##########
             # DEBUG
             ##########
@@ -194,10 +199,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             # END DEBUG
             ##########
 
-            tick_labels = self. _detect_axes_label_text(
-                axes_segmentations=axes_segmentations,
-                plot_types=plot_types
-            )
             plot_values = self._detect_plot_values(
                 axes_segmentations=axes_segmentations,
                 plot_types=plot_types,

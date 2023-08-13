@@ -121,10 +121,11 @@ class DetectText:
                 boxes = axis_pred['boxes']
                 masks = axis_pred['masks']
 
-                boxes, masks = self._resize_boxes_and_masks(
-                    img=img,
-                    boxes=boxes,
-                    masks=masks)
+                if boxes.shape[0] > 0 and masks.shape[0] > 0:
+                    boxes, masks = self._resize_boxes_and_masks(
+                        img=img,
+                        boxes=boxes,
+                        masks=masks)
 
                 cropped_images = [
                     self._preprocess_cropped_text(img=img, mask=mask)
