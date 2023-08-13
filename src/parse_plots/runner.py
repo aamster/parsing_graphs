@@ -173,10 +173,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_ids=[k for k in horizontal_bar_plots]
                     )
                 for img_id in hb_axes_segmentations:
-                    axes_segmentations[img_id]['y-axis']['boxes'] = \
-                        hb_axes_segmentations[img_id]['bboxes']
-                    axes_segmentations[img_id]['y-axis']['masks'] = \
-                        hb_axes_segmentations[img_id]['masks']
+                    if hb_axes_segmentations[img_id] is not None:
+                        axes_segmentations[img_id]['y-axis']['boxes'] = \
+                            hb_axes_segmentations[img_id]['bboxes']
+                        axes_segmentations[img_id]['y-axis']['masks'] = \
+                            hb_axes_segmentations[img_id]['masks']
 
             ##########
             # DEBUG
@@ -775,15 +776,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             model=self._detect_axes_labels_model,
             datamodule=data_module
         )
-        ######
-        # DEBUG
-        return {
-            image_id: {
-                'bboxes': [],
-                'masks': []
-            }
-            for image_id in predictions[0]}
-        ######
         predictions = predictions[0]
 
         d = {}
@@ -800,18 +792,22 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     label_fields=['class_labels']
                 )
             )
-            transformed = rotation_transform(
-                image=np.zeros((448, 448)),
-                bboxes=predictions[image_id]['x-axis']['boxes'],
-                masks=[x.numpy() for x in predictions[image_id]['x-axis']['masks']],
-                class_labels=predictions[image_id]['x-axis']['labels']
-            )
-            transformed['masks'] = torch.tensor(
-                np.array(transformed['masks'])).to(
-                    predictions[image_id]['y-axis']['masks'].device)
-            transformed['bboxes'] = torch.tensor(
-                np.array(transformed['bboxes'])).to(
-                    predictions[image_id]['y-axis']['boxes'].device)
+
+            if predictions[image_id]['x-axis']['masks'].shape[0] > 0:
+                transformed = rotation_transform(
+                    image=np.zeros((448, 448)),
+                    bboxes=predictions[image_id]['x-axis']['boxes'],
+                    masks=[x.numpy() for x in predictions[image_id]['x-axis']['masks']],
+                    class_labels=predictions[image_id]['x-axis']['labels']
+                )
+                transformed['masks'] = torch.tensor(
+                    np.array(transformed['masks'])).to(
+                        predictions[image_id]['y-axis']['masks'].device)
+                transformed['bboxes'] = torch.tensor(
+                    np.array(transformed['bboxes'])).to(
+                        predictions[image_id]['y-axis']['boxes'].device)
+            else:
+                transformed = None
             d[image_id] = transformed
         return d
 
