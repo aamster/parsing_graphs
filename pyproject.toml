@@ -4,7 +4,7 @@
 # -----------------------------------------------------------------------------
 
 [build-system]
-requires = ["setuptools>=59", "wheel"]
+requires = ["setuptools>=59", "wheel", "setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 
@@ -35,3 +35,6 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools-git-versioning]
+enabled = true
