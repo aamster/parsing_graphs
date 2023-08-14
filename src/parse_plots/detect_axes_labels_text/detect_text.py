@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Union
 
+import albumentations
 import cv2
 import numpy as np
 import pandas as pd
@@ -328,12 +329,16 @@ class DetectText:
 
         x, y, w, h = cv2.boundingRect(contour)
 
-        img = TF.rotate(Image.fromarray(img.moveaxis(0, 2).numpy()), angle - 90,
-                        interpolation=transforms.InterpolationMode.BICUBIC,
-                        expand=True)
+        rotation_transform = albumentations.Compose([
+            albumentations.Affine(rotate=(angle - 90, angle - 90),
+                                  interpolation=cv2.INTER_CUBIC,
+                                  mode=cv2.BORDER_CONSTANT,
+                                  fit_output=True,
+                                  p=1.0),
+        ])
+        rotated_img = rotation_transform(image=img.moveaxis(0, 2).numpy())['image']
 
-        img = np.array(img)
-        rotated_img = img[y:y + h, x:x + w]
+        rotated_img = rotated_img[y:y + h, x:x + w]
         return rotated_img
 
     @staticmethod
