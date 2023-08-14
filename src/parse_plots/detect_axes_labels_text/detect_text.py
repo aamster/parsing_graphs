@@ -148,6 +148,13 @@ class DetectText:
 
                 else:
                     text = []
+
+                #######
+                # DEBUG
+                axis_text[axis] = []
+                continue
+                ########
+                
                 text = np.array(text)
                 axis_text[axis] = text
             res[file_id] = axis_text
