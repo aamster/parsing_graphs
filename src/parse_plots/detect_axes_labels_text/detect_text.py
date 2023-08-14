@@ -310,6 +310,10 @@ class DetectText:
     @staticmethod
     def _rotate_cropped_text(img: torch.Tensor, mask):
         rect = DetectText.get_min_area_rect(mask=mask)
+        #########
+        # DEBUG
+        return img
+        #########
         if rect is None:
             return img
         center, size, angle = rect
