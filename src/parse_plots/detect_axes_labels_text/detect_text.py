@@ -309,14 +309,13 @@ class DetectText:
 
     @staticmethod
     def _rotate_cropped_text(img: torch.Tensor, mask):
-        center, size, angle = DetectText.get_min_area_rect(mask=mask)
-        #     plt.imshow(mask, cmap='gray')
-        #     plt.show()
+        rect = DetectText.get_min_area_rect(mask=mask)
+        if rect is None:
+            return img
+        center, size, angle = rect
 
         mask = TF.rotate(mask.unsqueeze(dim=0), angle - 90, expand=True)
         mask = mask.moveaxis(0, 2).numpy()
-        #     plt.imshow(mask, cmap='gray')
-        #     plt.show()
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_NONE)
 
@@ -354,7 +353,7 @@ class DetectText:
                                        cv2.CHAIN_APPROX_NONE)
 
         if len(contours) == 0:
-            raise RuntimeError('found no contours')
+            return None
         elif len(contours) > 1:
             contour = contours[DetectText.find_largest_mask(contours=contours)]
         else:
@@ -362,7 +361,6 @@ class DetectText:
 
         center, size, angle = cv2.minAreaRect(contour)
         x, y, w, h = cv2.boundingRect(contour)
-        #     print(w, h)
         if h > 1.5 * w:
             if angle == 90:
                 # probably vertical text and angle should be 0
