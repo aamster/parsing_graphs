@@ -326,11 +326,6 @@ class DetectText:
         else:
             return img
 
-        #########
-        # DEBUG
-        return img
-        #########
-
         x, y, w, h = cv2.boundingRect(contour)
 
         img = TF.rotate(Image.fromarray(img.moveaxis(0, 2).numpy()), angle - 90,
