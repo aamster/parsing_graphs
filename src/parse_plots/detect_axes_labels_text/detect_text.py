@@ -132,14 +132,14 @@ class DetectText:
                     self._preprocess_cropped_text(img=img, mask=mask)
                     for mask in masks]
 
-                #######
-                # DEBUG
-                axis_text[axis] = []
-                continue
-                ########
-
                 if len(cropped_images) > 0:
                     text = self._get_text(imgs=cropped_images)
+                    #######
+                    # DEBUG
+                    axis_text[axis] = []
+                    continue
+                    ########
+                    
                     # remove duplicates
                     text_dups_removes = []
                     text_idxs_kept = []
@@ -154,7 +154,6 @@ class DetectText:
 
                 else:
                     text = []
-
                 text = np.array(text)
                 axis_text[axis] = text
             res[file_id] = axis_text
