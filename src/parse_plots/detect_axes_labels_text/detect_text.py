@@ -135,6 +135,11 @@ class DetectText:
                 if len(cropped_images) > 0:
                     text = self._get_text(imgs=cropped_images)
 
+                    #####
+                    # DEBUG
+                    # works until here
+                    #####
+
                     # remove duplicates
                     text_dups_removes = []
                     text_idxs_kept = []
@@ -143,9 +148,12 @@ class DetectText:
                             text_dups_removes.append(label)
                             text_idxs_kept.append(i)
                     text = text_dups_removes
-                    axis_pred['boxes'] = axis_pred['boxes'][text_idxs_kept]
-                    axis_pred['masks'] = axis_pred['masks'][text_idxs_kept]
-                    axis_pred['labels'] = axis_pred['labels'][text_idxs_kept]
+                    try:
+                        axis_pred['boxes'] = axis_pred['boxes'][text_idxs_kept]
+                        axis_pred['masks'] = axis_pred['masks'][text_idxs_kept]
+                        axis_pred['labels'] = axis_pred['labels'][text_idxs_kept]
+                    except IndexError:
+                        pass
 
                 else:
                     text = []
