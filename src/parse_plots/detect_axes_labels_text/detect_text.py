@@ -310,10 +310,6 @@ class DetectText:
     @staticmethod
     def _rotate_cropped_text(img: torch.Tensor, mask):
         rect = DetectText.get_min_area_rect(mask=mask)
-        #########
-        # DEBUG
-        return img
-        #########
         if rect is None:
             return img
         center, size, angle = rect
@@ -325,8 +321,15 @@ class DetectText:
 
         if len(contours) > 1:
             contour = contours[DetectText.find_largest_mask(contours=contours)]
-        else:
+        elif len(contours) == 1:
             contour = contours[0]
+        else:
+            return img
+
+        #########
+        # DEBUG
+        return img
+        #########
 
         x, y, w, h = cv2.boundingRect(contour)
 
