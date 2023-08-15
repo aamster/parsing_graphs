@@ -157,15 +157,6 @@ class DetectText:
                 axis_text[axis] = text
             res[file_id] = axis_text
 
-            #######
-            # DEBUG
-            res[file_id] = {
-                axis: []
-                for axis in ('x-axis', 'y-axis')
-            }
-            continue
-            ########
-
             res[file_id] = {
                 axis: self._postprocess_text(
                     axis=axis,
