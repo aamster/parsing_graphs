@@ -15,6 +15,8 @@ from easyocr.recognition import get_text
 from easyocr.utils import get_image_list, reformat_input
 from sklearn.linear_model import LinearRegression
 
+from parse_plots.find_axes_tick_labels.dataset import axes_label_map
+
 torchvision.disable_beta_transforms_warning()
 
 from torchvision import datapoints, io
@@ -143,18 +145,26 @@ class DetectText:
                             text_dups_removes.append(label)
                             text_idxs_kept.append(i)
                     text = text_dups_removes
-                    try:
-                        axis_pred['boxes'] = axis_pred['boxes'][text_idxs_kept]
-                        axis_pred['masks'] = axis_pred['masks'][text_idxs_kept]
-                        axis_pred['labels'] = axis_pred['labels'][text_idxs_kept]
-                    except IndexError:
-                        pass
+                    axis_pred['boxes'] = axis_pred['boxes'][text_idxs_kept]
+                    axis_pred['masks'] = axis_pred['masks'][text_idxs_kept]
+                    axis_pred['labels'] = torch.tensor(
+                        [axes_label_map[axis] * len(text_idxs_kept)])\
+                        .to(axis_pred['labels'].device)
 
                 else:
                     text = []
                 text = np.array(text)
                 axis_text[axis] = text
             res[file_id] = axis_text
+
+            #######
+            # DEBUG
+            res[file_id] = {
+                axis: []
+                for axis in ('x-axis', 'y-axis')
+            }
+            continue
+            ########
 
             res[file_id] = {
                 axis: self._postprocess_text(
@@ -187,10 +197,7 @@ class DetectText:
             # if it is numeric or more than half are numeric, assume it is
             # numeric
             if expected_type == 'numeric' or numeric_frac > 0.5:
-                # protect against all string values
-                if all(isinstance(x, str) for x in axis_text):
-                    pass
-                elif all(isinstance(x, (int, float)) for x in axis_text):
+                if all(isinstance(x, (int, float)) for x in axis_text):
                     pass
                 else:
                     # If not numeric, interpolate
@@ -210,7 +217,7 @@ class DetectText:
                         axis_text[i] if i in numeric_text_idx else preds[i]
                         for i in range(len(axis_text))]
 
-        if all(is_numeric(x) for x in axis_text):
+        if all(is_numeric(x) for x in axis_text) and len(axis_text) > 1:
             axis_text = self._correct_numeric_sequence(axis=axis_text)
 
         if expected_type == 'categorical' or 'categorical' in expected_type:
@@ -295,7 +302,7 @@ class DetectText:
         results = get_text(
             character=self._easyocr_reader.character,
             imgH=32,
-            imgW=100,
+            imgW=max(max_widths),
             recognizer=self._easyocr_reader.recognizer,
             converter=self._easyocr_reader.converter,
             image_list=preprocessed_images,
