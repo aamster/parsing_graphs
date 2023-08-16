@@ -277,11 +277,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     )
                 ))
 
-        ########
-        # DEBUG
-        return
-        ########
-
         other_plot_ids = [x for x in axes_segmentations
                           if plot_types[x] != 'line']
         if other_plot_ids:
@@ -304,6 +299,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     )
                 ))
 
+        ########
+        # DEBUG
+        return
+        ########
+        
         file_id_plot_points_map = {}
         for file_id, img_coordinates in plot_values_img_coordinates:
             axes = self._get_tick_points(
