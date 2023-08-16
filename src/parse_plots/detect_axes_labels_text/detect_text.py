@@ -216,13 +216,11 @@ class DetectText:
                     except: # noqa e722 unknown error
                         pass
 
-        #####
-        # DEBUG
-        return axis_text
-        #####
-
         if all(is_numeric(x) for x in axis_text) and len(axis_text) > 1:
-            axis_text = self._correct_numeric_sequence(axis=axis_text)
+            try:
+                axis_text = self._correct_numeric_sequence(axis=axis_text)
+            except: # noqa e722 unknown error
+                pass
 
         if expected_type == 'categorical' or 'categorical' in expected_type:
             # make sure all string and no numbers
