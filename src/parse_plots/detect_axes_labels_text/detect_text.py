@@ -191,27 +191,30 @@ class DetectText:
                 if all(isinstance(x, (int, float)) for x in axis_text):
                     pass
                 else:
-                    # If not numeric, interpolate
-                    reg = LinearRegression()
-                    numeric_text_idx = [
-                        i for i in range(len(axis_text))
-                        if isinstance(axis_text[i], (int, float)) and
-                        not np.isnan(axis_text[i]) and
-                        axis_text[i] is not None]
-                    non_numeric_text_idx = [
-                        i for i in range(len(axis_text))
-                        if i not in numeric_text_idx]
-                    if len(numeric_text_idx) != 0 and \
-                            len(non_numeric_text_idx) != 0:
-                        reg.fit(
-                            np.array(numeric_text_idx).reshape(-1, 1),
-                            np.array(axis_text)[numeric_text_idx].reshape(-1, 1))
-                        preds = reg.predict(
-                            np.array(non_numeric_text_idx).reshape(-1, 1)).flatten()
-                        preds = dict(zip(non_numeric_text_idx, preds))
-                        axis_text = [
-                            axis_text[i] if i in numeric_text_idx else preds[i]
-                            for i in range(len(axis_text))]
+                    try:
+                        # If not numeric, interpolate
+                        reg = LinearRegression()
+                        numeric_text_idx = [
+                            i for i in range(len(axis_text))
+                            if isinstance(axis_text[i], (int, float)) and
+                            not np.isnan(axis_text[i]) and
+                            axis_text[i] is not None]
+                        non_numeric_text_idx = [
+                            i for i in range(len(axis_text))
+                            if i not in numeric_text_idx]
+                        if len(numeric_text_idx) != 0 and \
+                                len(non_numeric_text_idx) != 0:
+                            reg.fit(
+                                np.array(numeric_text_idx).reshape(-1, 1),
+                                np.array(axis_text)[numeric_text_idx].reshape(-1, 1))
+                            preds = reg.predict(
+                                np.array(non_numeric_text_idx).reshape(-1, 1)).flatten()
+                            preds = dict(zip(non_numeric_text_idx, preds))
+                            axis_text = [
+                                axis_text[i] if i in numeric_text_idx else preds[i]
+                                for i in range(len(axis_text))]
+                    except: # noqa e722 unknown error
+                        pass
 
         if all(is_numeric(x) for x in axis_text) and len(axis_text) > 1:
             axis_text = self._correct_numeric_sequence(axis=axis_text)
