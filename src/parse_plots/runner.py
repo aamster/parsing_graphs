@@ -36,7 +36,8 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 
 from parse_plots.classify_plot_type.dataset import ClassifyPlotTypeDataset
 from parse_plots.classify_plot_type.model import ClassifyPlotTypeModel
-from parse_plots.detect_axes_labels_text.detect_text import DetectText
+from parse_plots.detect_axes_labels_text.detect_text import DetectText, \
+    sort_boxes
 from parse_plots.detect_plot_values.model import DetectPlotValuesModel
 from parse_plots.find_axes_tick_labels.dataset import FindAxesTickLabelsDataset
 from parse_plots.find_axes_tick_labels.model import SegmentAxesTickLabelsModel
@@ -204,7 +205,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             ##########
             # END DEBUG
             ##########
-            
+
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
                 # add string values
@@ -808,6 +809,13 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 transformed['bboxes'] = torch.tensor(
                     np.array(transformed['bboxes'])).to(
                         predictions[image_id]['y-axis']['boxes'].device)
+
+                sort_idx = sort_boxes(
+                    transformed['bboxes'],
+                    axis='y-axis')
+                transformed['bboxes'] = transformed['bboxes'][sort_idx]
+                transformed['masks'] = transformed['masks'][sort_idx]
+
             else:
                 transformed = None
             d[image_id] = transformed
