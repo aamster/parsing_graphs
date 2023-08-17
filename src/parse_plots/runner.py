@@ -268,6 +268,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 model=self._segment_line_plot_model,
                 axes_segmentations=axes_segmentations
             )
+            ########
+            # DEBUG
+            return
+            ########
+
             for i, plot_id in enumerate(line_plot_ids):
                 plot_values_img_coordinates.append((
                     plot_id,
@@ -299,11 +304,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     )
                 ))
 
-        ########
-        # DEBUG
-        return
-        ########
-        
         file_id_plot_points_map = {}
         for file_id, img_coordinates in plot_values_img_coordinates:
             axes = self._get_tick_points(
