@@ -73,10 +73,16 @@ class DetectPlotValuesModel(lightning.LightningModule):
             preds[i]['boxes'] = preds[i]['boxes'][preds[i]['scores'] > 0.5]
             preds[i]['labels'] = preds[i]['labels'][preds[i]['scores'] > 0.5]
 
-            predicted_plot_type_id = preds[i]['labels'].mode().values.item()
-            predicted_plot_type = plot_type_id_value_map[predicted_plot_type_id]
+            if preds[i]['labels'].shape[0] > 0:
+                predicted_plot_type_id = preds[i]['labels'].mode().values.item()
+            else:
+                # just guess
+                predicted_plot_type_id = 4
 
-            if preds[i]['boxes'].shape > 0:
+            predicted_plot_type = plot_type_id_value_map[
+                predicted_plot_type_id]
+            
+            if preds[i]['boxes'].shape[0] > 0:
                 sort_idx = sort_boxes(
                     preds[i]['boxes'],
                     axis=('x-axis' if predicted_plot_type != 'horizontal_bar'
