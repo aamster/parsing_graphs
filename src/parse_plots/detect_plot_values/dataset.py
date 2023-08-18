@@ -142,13 +142,6 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         if not self._is_train:
-            if self._plot_meta is None:
-                raise ValueError('plot_meta must be given if not train')
-            plot_bb = self._plot_meta[id]['plot_bbox']
-            plot_bb = resize_plot_bounding_box(
-                img=img,
-                plot_bounding_box=plot_bb
-            )
             if self._transform is not None:
                 if isinstance(self._transform, albumentations.Compose):
                     img = self._transform(image=img)['image']
@@ -159,7 +152,6 @@ class DetectPlotValuesDataset(torch.utils.data.Dataset):
 
             return img, {
                 'image_id': id,
-                'plot_bbox': plot_bb,
                 'image_shape': img.shape
             }
 

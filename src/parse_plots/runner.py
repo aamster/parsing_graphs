@@ -70,7 +70,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             #plot_ids = plot_ids[:self.args['debug_num']]
-            plot_ids = ['0b507ccf1a99']
+            plot_ids = ['000b92c3b098']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -265,8 +265,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             line_masks = self._detect_plot_values_with_model(
                 plot_ids=line_plot_ids,
                 plot_types=plot_types,
-                model=self._segment_line_plot_model,
-                axes_segmentations=axes_segmentations
+                model=self._segment_line_plot_model
             )
             ########
             # DEBUG
@@ -286,15 +285,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         # DEBUG
         return
         ########
-        
+
         other_plot_ids = [x for x in axes_segmentations
                           if plot_types[x] != 'line']
         if other_plot_ids:
             predictions = self._detect_plot_values_with_model(
                 plot_ids=other_plot_ids,
                 plot_types=plot_types,
-                model=self._detect_plot_values_model,
-                axes_segmentations=axes_segmentations
+                model=self._detect_plot_values_model
             )
             predictions = predictions[0]
             for i, plot_id in enumerate(other_plot_ids):
@@ -591,16 +589,10 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             self,
             plot_types,
             plot_ids,
-            model: LightningModule,
-            axes_segmentations: Dict
+            model: LightningModule
     ):
-        # the bounding box containing just the plot
-        plots_bounding_box = self._get_plot_bounding_boxes(
-            axes_segmentations=axes_segmentations
-        )
         data_module_kwargs = {
-            'is_train': False,
-            'plot_meta': plots_bounding_box
+            'is_train': False
         }
 
         if isinstance(model, DetectPlotValuesModel):
