@@ -75,20 +75,22 @@ class DetectPlotValuesModel(lightning.LightningModule):
 
             predicted_plot_type_id = preds[i]['labels'].mode().values.item()
             predicted_plot_type = plot_type_id_value_map[predicted_plot_type_id]
-            sort_idx = sort_boxes(
-                preds[i]['boxes'],
-                axis=('x-axis' if predicted_plot_type != 'horizontal_bar'
-                      else 'y-axis'))
-            preds[i]['boxes'] = preds[i]['boxes'][sort_idx]
-            preds[i]['labels'] = torch.tensor(
-                [predicted_plot_type_id] * len(sort_idx))\
-                .to(preds[i]['labels'].device)
 
-            preds[i]['boxes'] = datapoints.BoundingBox(
-                preds[i]['boxes'],
-                format=datapoints.BoundingBoxFormat.XYXY,
-                spatial_size=batch[1][i]['image_shape'][1:]
-            )
+            if preds[i]['boxes'].shape > 0:
+                sort_idx = sort_boxes(
+                    preds[i]['boxes'],
+                    axis=('x-axis' if predicted_plot_type != 'horizontal_bar'
+                          else 'y-axis'))
+                preds[i]['boxes'] = preds[i]['boxes'][sort_idx]
+                preds[i]['labels'] = torch.tensor(
+                    [predicted_plot_type_id] * len(sort_idx))\
+                    .to(preds[i]['labels'].device)
+
+                preds[i]['boxes'] = datapoints.BoundingBox(
+                    preds[i]['boxes'],
+                    format=datapoints.BoundingBoxFormat.XYXY,
+                    spatial_size=batch[1][i]['image_shape'][1:]
+                )
 
         return preds
 
