@@ -267,10 +267,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 plot_types=plot_types,
                 model=self._segment_line_plot_model
             )
-            ########
-            # DEBUG
-            return
-            ########
 
             for i, plot_id in enumerate(line_plot_ids):
                 plot_values_img_coordinates.append((
@@ -280,11 +276,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         line_plot_mask=line_masks[0][i]
                     )
                 ))
-
-        ########
-        # DEBUG
-        return
-        ########
 
         other_plot_ids = [x for x in axes_segmentations
                           if plot_types[x] != 'line']
