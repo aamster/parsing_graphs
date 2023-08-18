@@ -67,10 +67,6 @@ class DetectPlotValuesModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         preds = self._get_predictions(batch=batch)
-        ######
-        # DEBUG
-        return
-        ######
 
         for i in range(len(preds)):
             # only include confident predictions
@@ -98,10 +94,6 @@ class DetectPlotValuesModel(lightning.LightningModule):
         self.model.eval()
         with torch.no_grad():
             data, target = batch
-            ######
-            # DEBUG
-            return
-            ######
             preds = self.model(data)
 
         return preds
