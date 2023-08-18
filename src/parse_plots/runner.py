@@ -69,8 +69,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            #plot_ids = plot_ids[:self.args['debug_num']]
-            plot_ids = ['000b92c3b098']
+            plot_ids = plot_ids[:self.args['debug_num']]
+            #plot_ids = ['000b92c3b098']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \

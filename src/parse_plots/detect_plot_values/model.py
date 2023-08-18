@@ -1,27 +1,13 @@
-from contextlib import contextmanager
 from typing import Dict, Any
 
 import lightning
 import torch.nn
 from torchmetrics.detection import MeanAveragePrecision
 from torchvision import datapoints
-from torchvision.ops import nms
 
 from parse_plots.detect_axes_labels_text.detect_text import sort_boxes
 from parse_plots.detect_plot_values.dataset import plot_type_id_value_map
 from parse_plots.utils import convert_to_tensor
-
-
-@contextmanager
-def evaluate(model: torch.nn.Module):
-    """Temporarily switch to evaluation mode."""
-    istrain = model.training
-    try:
-        model.eval()
-        yield model
-    finally:
-        if istrain:
-            model.train()
 
 
 class DetectPlotValuesModel(lightning.LightningModule):
@@ -49,6 +35,7 @@ class DetectPlotValuesModel(lightning.LightningModule):
 
     def training_step(self, batch, batch_idx):
         data, target = batch
+        self.model.train()
         losses = self.model(data, target)
 
         # sums the classification and regression losses for both the
@@ -80,6 +67,10 @@ class DetectPlotValuesModel(lightning.LightningModule):
             dataloader_idx: int = 0
     ):
         preds = self._get_predictions(batch=batch)
+        ######
+        # DEBUG
+        return
+        ######
 
         for i in range(len(preds)):
             # only include confident predictions
@@ -104,10 +95,14 @@ class DetectPlotValuesModel(lightning.LightningModule):
         return preds
 
     def _get_predictions(self, batch):
-        with evaluate(model=self.model):
-            with torch.no_grad():
-                data, target = batch
-                preds = self.model(data)
+        self.model.eval()
+        with torch.no_grad():
+            data, target = batch
+            ######
+            # DEBUG
+            return
+            ######
+            preds = self.model(data)
 
         return preds
 
