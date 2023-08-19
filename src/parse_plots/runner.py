@@ -191,20 +191,20 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 tick_labels=tick_labels
             )
 
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
+            # ##########
+            # # DEBUG
+            # ##########
+            # data_series = self._construct_data_series(
+            #     plot_types={k: 'vertical_bar' for k in axes_segmentations},
+            #     file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+            #                              for k in axes_segmentations}
+            # )
+            # data_series = pd.DataFrame(data_series)
+            # all_data_series.append(data_series)
+            # continue
+            # ##########
+            # # END DEBUG
+            # ##########
 
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
@@ -299,11 +299,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_type=plot_types[plot_id]
                     )
                 ))
-
-        ########
-        # DEBUG
-        return
-        ########
 
         file_id_plot_points_map = {}
         for file_id, img_coordinates in plot_values_img_coordinates:
