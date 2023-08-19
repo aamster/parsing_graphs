@@ -289,8 +289,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             predictions = predictions[0]
             for i, plot_id in enumerate(other_plot_ids):
                 if plot_types[plot_id] == 'horizontal_bar':
-                    predictions[i]['boxes'] = T.RandomRotation(
-                        degrees=(-90, -90))(predictions[i]['boxes'])
+                    if predictions[i]['boxes'].shape[0] > 0:
+                        predictions[i]['boxes'] = T.RandomRotation(
+                            degrees=(-90, -90))(predictions[i]['boxes'])
                 plot_values_img_coordinates.append((
                     plot_id,
                     self._get_plot_values_in_img_coordinates(
