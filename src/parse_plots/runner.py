@@ -286,11 +286,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 model=self._detect_plot_values_model
             )
 
-            ########
-            # DEBUG
-            return
-            ########
-
             predictions = predictions[0]
             for i, plot_id in enumerate(other_plot_ids):
                 if plot_types[plot_id] == 'horizontal_bar':
@@ -303,11 +298,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_type=plot_types[plot_id]
                     )
                 ))
-
-        ########
-        # DEBUG
-        return
-        ########
 
         file_id_plot_points_map = {}
         for file_id, img_coordinates in plot_values_img_coordinates:

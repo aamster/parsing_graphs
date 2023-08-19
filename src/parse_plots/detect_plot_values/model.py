@@ -81,7 +81,7 @@ class DetectPlotValuesModel(lightning.LightningModule):
 
             predicted_plot_type = plot_type_id_value_map[
                 predicted_plot_type_id]
-            
+
             if preds[i]['boxes'].shape[0] > 0:
                 sort_idx = sort_boxes(
                     preds[i]['boxes'],
