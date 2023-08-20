@@ -193,26 +193,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
-                # add string values
                 plot_points_ = []
                 for i in range(len(plot_points)):
                     plot_point = [plot_points[i][0], plot_points[i][1]]
-                    if plot_point[0] is None:
-                        if i >= len(tick_labels[file_id]['x-axis']):
-                            # more plot values than ticks (in the case of bar
-                            # chart is a problem)
-                            plot_point[0] = ''
-                        else:
-                            plot_point[0] = tick_labels[file_id]['x-axis'][i]
-
-                    if plot_point[1] is None:
-                        if i >= len(tick_labels[file_id]['y-axis']):
-                            # more plot values than ticks (in the case of bar
-                            # chart is a problem)
-                            plot_point[1] = ''
-                        else:
-                            plot_point[1] = tick_labels[file_id]['y-axis'][i]
-
                     plot_points_.append(tuple(plot_point))
 
                 if plot_types[file_id] == 'horizontal_bar':
@@ -305,7 +288,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
                     if len(axes_segmentations[file_id][f'{axis}-axis']['boxes'])\
                             == 0:
-                        plot_point_values.append(None)
                         continue
 
                     closest_tick_label_idx = \
@@ -320,7 +302,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         [closest_tick_label_idx])
 
                     if isinstance(closest_tick_val, str):
-                        plot_point_values.append(None)
+                        plot_point_values.append(closest_tick_val)
                     else:
                         if len(axes[f'{axis}-axis']) < 2 or \
                                 len(tick_labels[file_id][f'{axis}-axis']) < 2:
@@ -357,41 +339,65 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 plot_points.append(plot_point_values)
 
             if plot_types[file_id] == 'dot':
-                if len(tick_labels[file_id]['x-axis']) == 0:
-                    continue
-                x_axis_numeric = \
-                    isinstance(tick_labels[file_id]['x-axis'][0],
-                               (int, float))
-                dot_counts = defaultdict(int)
+                plot_points = self._get_dot_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
 
-                for coord_idx in range(len(plot_points)):
-                    x, y = plot_points[coord_idx]
-
-                    if isinstance(x, (int, float)):
-                        x = round(x)
-                    dot_counts[x] += 1
-                if x_axis_numeric:
-                    plot_points = [
-                        [k, dot_counts[k]] for k in sorted(dot_counts)]
-                else:
-                    plot_points = [
-                        [k, dot_counts[k]] for k in
-                        tick_labels[file_id]['x-axis']
-                    ]
-
-            if plot_types[file_id] == 'vertical_bar' and \
-                    len(tick_labels[file_id]['x-axis']) == \
-                    len(plot_points) + 1:
-                # it's a histogram
-                if len(tick_labels[file_id]['x-axis']) == 0:
-                    continue
-                plot_points = list(zip(
-                    tick_labels[file_id]['x-axis'],
-                    [x[1] for x in plot_points])) + \
-                    [(tick_labels[file_id]['x-axis'][-1],
-                      'HISTOGRAM_PLACEHOLDER')]
+            elif self._is_histogram(
+                plot_type=plot_types[file_id],
+                tick_labels=tick_labels[file_id],
+                plot_points=plot_points
+            ):
+                plot_points = self._get_histogram_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
             file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
+
+    @staticmethod
+    def _is_histogram(
+            plot_type: str,
+            tick_labels: Dict,
+            plot_points: List[List]):
+        return plot_type == 'vertical_bar' and \
+               len(tick_labels['x-axis']) == len(plot_points) + 1
+
+    @staticmethod
+    def _get_histogram_values(tick_labels: Dict, plot_points: List[List]):
+        if len(tick_labels['x-axis']) == 0:
+            return []
+        plot_points = list(zip(
+            tick_labels['x-axis'],
+            [x[1] for x in plot_points])) + \
+            [(tick_labels['x-axis'][-1], 'HISTOGRAM_PLACEHOLDER')]
+        return plot_points
+
+    @staticmethod
+    def _get_dot_values(tick_labels: Dict, plot_points: List[List]):
+        if len(tick_labels['x-axis']) == 0:
+            return []
+        x_axis_numeric = \
+            isinstance(tick_labels['x-axis'][0],
+                       (int, float))
+        dot_counts = defaultdict(int)
+
+        for coord_idx in range(len(plot_points)):
+            x, y = plot_points[coord_idx]
+
+            if isinstance(x, (int, float)):
+                x = round(x)
+            dot_counts[x] += 1
+        if x_axis_numeric:
+            plot_points = [
+                [k, dot_counts[k]] for k in sorted(dot_counts)]
+        else:
+            plot_points = [
+                [k, dot_counts[k]] for k in
+                tick_labels['x-axis']
+            ]
+        return plot_points
 
     @staticmethod
     def _get_tick_values(axis: List[Dict], plot_values, axis_name: str):
