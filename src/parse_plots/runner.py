@@ -69,8 +69,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
-            plot_ids = plot_ids[:self.args['debug_num']]
-            #plot_ids = ['000b92c3b098']
+            #plot_ids = plot_ids[:self.args['debug_num']]
+            plot_ids = ['0b160cb2f74d']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -190,21 +190,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 plot_types=plot_types,
                 tick_labels=tick_labels
             )
-
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
 
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
@@ -359,15 +344,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     plot_points=plot_points
                 )
 
-            # elif self._is_histogram(
-            #     plot_type=plot_types[file_id],
-            #     tick_labels=tick_labels[file_id],
-            #     plot_points=plot_points
-            # ):
-            #     plot_points = self._get_histogram_values(
-            #         tick_labels=tick_labels[file_id],
-            #         plot_points=plot_points
-            #     )
+            elif self._is_histogram(
+                plot_type=plot_types[file_id],
+                tick_labels=tick_labels[file_id],
+                plot_points=plot_points
+            ):
+                plot_points = self._get_histogram_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
             file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
@@ -403,7 +388,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         else:
             plot_points = [
                 [k, dot_counts[k]] for k in
-                tick_labels['x-axis']
+                tick_labels['x-axis'] if k in dot_counts
             ]
         return plot_points
 
