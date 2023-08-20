@@ -368,6 +368,10 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_point_values.append(plot_val)
                 plot_points.append(plot_point_values)
 
+            ######
+            # DEBUG
+            return
+            ######
             if plot_types[file_id] == 'dot':
                 x_axis_numeric = \
                     isinstance(tick_labels[file_id]['x-axis'][0],
