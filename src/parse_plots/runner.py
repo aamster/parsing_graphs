@@ -191,6 +191,21 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 tick_labels=tick_labels
             )
 
+            ##########
+            # DEBUG
+            ##########
+            data_series = self._construct_data_series(
+                plot_types={k: 'vertical_bar' for k in axes_segmentations},
+                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
+                                         for k in axes_segmentations}
+            )
+            data_series = pd.DataFrame(data_series)
+            all_data_series.append(data_series)
+            continue
+            ##########
+            # END DEBUG
+            ##########
+
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
                 plot_points_ = []
@@ -338,23 +353,22 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_point_values.append(plot_val)
                 plot_points.append(plot_point_values)
 
-            file_id_plot_points_map[file_id] = plot_points
+            if plot_types[file_id] == 'dot':
+                plot_points = self._get_dot_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
 
-            # if plot_types[file_id] == 'dot':
-            #     plot_points = self._get_dot_values(
-            #         tick_labels=tick_labels[file_id],
-            #         plot_points=plot_points
-            #     )
-            #
-            # elif self._is_histogram(
-            #     plot_type=plot_types[file_id],
-            #     tick_labels=tick_labels[file_id],
-            #     plot_points=plot_points
-            # ):
-            #     plot_points = self._get_histogram_values(
-            #         tick_labels=tick_labels[file_id],
-            #         plot_points=plot_points
-            #     )
+            elif self._is_histogram(
+                plot_type=plot_types[file_id],
+                tick_labels=tick_labels[file_id],
+                plot_points=plot_points
+            ):
+                plot_points = self._get_histogram_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
+            file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
     @staticmethod
