@@ -337,6 +337,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     if isinstance(closest_tick_val, str):
                         plot_point_values.append(None)
                     else:
+                        if len(axes[f'{axis}-axis']) < 2 or \
+                                len(tick_labels[file_id][f'{axis}-axis']) < 2:
+                            continue
                         axis_spacing = abs(
                             axes[f'{axis}-axis'][1]['tick_pt'] -
                             axes[f'{axis}-axis'][0]['tick_pt'])
@@ -412,6 +415,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         min_dists = np.zeros(len(plot_values))
         tick_min_dist_idx = np.zeros(len(plot_values))
         tick_values = {x['tick_id']: [] for x in axis}
+        if len(axis) == 0:
+            return tick_values
         for i, (x, y) in enumerate(plot_values):
             plot_value = x if axis_name == 'x-axis' else y
             dists = [abs(plot_value - tick_pt['tick_pt'])
