@@ -191,21 +191,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 tick_labels=tick_labels
             )
 
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
-            
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
                 plot_points_ = []
@@ -359,15 +344,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     plot_points=plot_points
                 )
 
-            # elif self._is_histogram(
-            #     plot_type=plot_types[file_id],
-            #     tick_labels=tick_labels[file_id],
-            #     plot_points=plot_points
-            # ):
-            #     plot_points = self._get_histogram_values(
-            #         tick_labels=tick_labels[file_id],
-            #         plot_points=plot_points
-            #     )
+            elif self._is_histogram(
+                plot_type=plot_types[file_id],
+                tick_labels=tick_labels[file_id],
+                plot_points=plot_points
+            ):
+                plot_points = self._get_histogram_values(
+                    tick_labels=tick_labels[file_id],
+                    plot_points=plot_points
+                )
             file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
@@ -391,20 +376,13 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     @staticmethod
     def _get_dot_values(tick_labels: Dict, plot_points: List[List]):
-        if len(tick_labels['x-axis']) == 0:
-            return []
-        x_axis_numeric = \
-            isinstance(tick_labels['x-axis'][0],
-                       (int, float))
         dot_counts = defaultdict(int)
 
-        for coord_idx in range(len(plot_points)):
-            x, y = plot_points[coord_idx]
-
+        for x, y in plot_points:
             if isinstance(x, (int, float)):
                 x = round(x)
             dot_counts[x] += 1
-        if x_axis_numeric:
+        if all(isinstance(x, (int, float)) for x, _ in plot_points):
             plot_points = [
                 [k, dot_counts[k]] for k in sorted(dot_counts)]
         else:
