@@ -191,21 +191,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 tick_labels=tick_labels
             )
 
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
-
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
                 # add string values
@@ -371,11 +356,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_point_values.append(plot_val)
                 plot_points.append(plot_point_values)
 
-            ######
-            # DEBUG
-            return
-            ######
             if plot_types[file_id] == 'dot':
+                if len(tick_labels[file_id]['x-axis']) == 0:
+                    continue
                 x_axis_numeric = \
                     isinstance(tick_labels[file_id]['x-axis'][0],
                                (int, float))
@@ -400,6 +383,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     len(tick_labels[file_id]['x-axis']) == \
                     len(plot_points) + 1:
                 # it's a histogram
+                if len(tick_labels[file_id]['x-axis']) == 0:
+                    continue
                 plot_points = list(zip(
                     tick_labels[file_id]['x-axis'],
                     [x[1] for x in plot_points])) + \
