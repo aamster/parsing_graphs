@@ -391,23 +391,27 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
     @staticmethod
     def _get_dot_values(tick_labels: Dict, plot_points: List[List]):
-        dot_counts = defaultdict(int)
+        try:
+            dot_counts = defaultdict(int)
 
-        # making sure all plot points have 2 coordinates
-        plot_points = [x for x in plot_points if len(x) == 2]
+            # making sure all plot points have 2 coordinates
+            plot_points = [x for x in plot_points if len(x) == 2]
 
-        for x, y in plot_points:
-            if isinstance(x, (int, float)):
-                x = round(x)
-            dot_counts[x] += 1
-        if all(isinstance(x, (int, float)) for x, _ in plot_points):
-            plot_points = [
-                [k, dot_counts[k]] for k in sorted(dot_counts)]
-        else:
-            plot_points = [
-                [k, dot_counts[k]] for k in
-                tick_labels['x-axis'] if k in dot_counts
-            ]
+            for x, y in plot_points:
+                if isinstance(x, (int, float)):
+                    x = round(x)
+                dot_counts[x] += 1
+            if all(isinstance(x, (int, float)) for x, _ in plot_points):
+                plot_points = [
+                    [k, dot_counts[k]] for k in sorted(dot_counts)]
+            else:
+                plot_points = [
+                    [k, dot_counts[k]] for k in
+                    tick_labels['x-axis'] if k in dot_counts
+                ]
+        except: # noqa E772 unknown error
+            pass
+
         return plot_points
 
     @staticmethod
