@@ -393,6 +393,9 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
     def _get_dot_values(tick_labels: Dict, plot_points: List[List]):
         dot_counts = defaultdict(int)
 
+        # making sure all plot points have 2 coordinates
+        plot_points = [x for x in plot_points if len(x) == 2]
+
         for x, y in plot_points:
             if isinstance(x, (int, float)):
                 x = round(x)
