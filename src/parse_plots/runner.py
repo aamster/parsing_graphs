@@ -195,7 +195,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             for file_id, plot_points in plot_values.items():
                 plot_points_ = []
                 for i in range(len(plot_points)):
-                    if len(plot_points) != 2:
+                    if len(plot_points[i]) != 2:
                         continue
                     plot_point = [plot_points[i][0], plot_points[i][1]]
                     plot_points_.append(tuple(plot_point))
