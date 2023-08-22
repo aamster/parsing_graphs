@@ -195,6 +195,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             for file_id, plot_points in plot_values.items():
                 plot_points_ = []
                 for i in range(len(plot_points)):
+                    if len(plot_points) != 2:
+                        continue
                     plot_point = [plot_points[i][0], plot_points[i][1]]
                     plot_points_.append(tuple(plot_point))
 
@@ -338,27 +340,24 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_point_values.append(plot_val)
                 plot_points.append(plot_point_values)
 
-            try:
-                if plot_types[file_id] == 'dot':
-                    plot_points = self._get_dot_values(
-                        tick_labels=tick_labels.get(file_id,
-                                                    {'x-axis': [], 'y-axis': []}),
-                        plot_points=plot_points
-                    )
-
-                elif self._is_histogram(
-                    plot_type=plot_types[file_id],
+            if plot_types[file_id] == 'dot':
+                plot_points = self._get_dot_values(
                     tick_labels=tick_labels.get(file_id,
                                                 {'x-axis': [], 'y-axis': []}),
                     plot_points=plot_points
-                ):
-                    plot_points = self._get_histogram_values(
-                        tick_labels=tick_labels.get(file_id,
-                                                    {'x-axis': [], 'y-axis': []}),
-                        plot_points=plot_points
-                    )
-            except: # noqa E772
-                pass
+                )
+
+            elif self._is_histogram(
+                plot_type=plot_types[file_id],
+                tick_labels=tick_labels.get(file_id,
+                                            {'x-axis': [], 'y-axis': []}),
+                plot_points=plot_points
+            ):
+                plot_points = self._get_histogram_values(
+                    tick_labels=tick_labels.get(file_id,
+                                                {'x-axis': [], 'y-axis': []}),
+                    plot_points=plot_points
+                )
             file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
