@@ -355,10 +355,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         plot_point_values.append(plot_val)
                 plot_points.append(plot_point_values)
 
-            ######
-            # DEBUG
-            return
-            ######
             if plot_types[file_id] == 'dot':
                 plot_points = self._get_dot_values(
                     tick_labels=tick_labels.get(file_id,
