@@ -437,15 +437,16 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             tick_min_dist_idx[i] = min_dist
             min_dists[i] = np.min(dists)
 
-        # protect against a plot value getting assigned to the wrong tick
-        # happens in case of bar where we miss the tick mark
-        q1, q3 = np.quantile(min_dists, (0.25, 0.75))
-        iqr = q3 - q1
+        if len(plot_values) > 0:
+            # protect against a plot value getting assigned to the wrong tick
+            # happens in case of bar where we miss the tick mark
+            q1, q3 = np.quantile(min_dists, (0.25, 0.75))
+            iqr = q3 - q1
 
-        for i, min_dist in enumerate(min_dists):
-            if q1 - iqr * 3 <= min_dist <= q3 + iqr * 3:
-                tick_values[axis[int(tick_min_dist_idx[i])]['tick_id']]\
-                    .append(plot_values[i])
+            for i, min_dist in enumerate(min_dists):
+                if q1 - iqr * 3 <= min_dist <= q3 + iqr * 3:
+                    tick_values[axis[int(tick_min_dist_idx[i])]['tick_id']]\
+                        .append(plot_values[i])
 
         return tick_values
 
