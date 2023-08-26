@@ -1,5 +1,7 @@
+import logging
 import math
 import os
+import sys
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -66,6 +68,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             input_data=input_data,
             args=args
         )
+        self.logger = self._initialize_logger()
+
         plot_files = os.listdir(self.args['plots_dir'])
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
@@ -94,6 +98,20 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         self._classify_plot_type_model = self.classify_plot_type_model
         self._detect_axes_labels_model = self.detect_axes_labels_model
         self._trainer = Trainer()
+
+    def _initialize_logger(self):
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+
+        logging.basicConfig(
+            format='%(asctime)s %(name)s %(levelname)-8s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+            level=self.logger.level,
+            stream=sys.stdout
+        )
+        logger = logging.getLogger(type(self).__name__)
+        logger.setLevel(level=self.logger.level)
+        return logger
 
     @property
     def detect_plot_values_model(self):
@@ -190,21 +208,6 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                 plot_types=plot_types,
                 tick_labels=tick_labels
             )
-
-            ##########
-            # DEBUG
-            ##########
-            data_series = self._construct_data_series(
-                plot_types={k: 'vertical_bar' for k in axes_segmentations},
-                file_id_plot_values_map={k: [('abc', 0.0), ('def', 1.0)]
-                                         for k in axes_segmentations}
-            )
-            data_series = pd.DataFrame(data_series)
-            all_data_series.append(data_series)
-            continue
-            ##########
-            # END DEBUG
-            ##########
 
             file_id_plot_values_map = {}
             for file_id, plot_points in plot_values.items():
