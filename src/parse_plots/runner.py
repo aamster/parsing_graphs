@@ -357,7 +357,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
 
             try:
                 if plot_types[file_id] == 'dot':
-                    plot_points = self._get_dot_values(
+                    file_id_plot_points_map[file_id] = self._get_dot_values(
                         tick_labels=tick_labels.get(file_id,
                                                     {'x-axis': [], 'y-axis': []}),
                         plot_points=plot_points
@@ -369,14 +369,15 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                                                 {'x-axis': [], 'y-axis': []}),
                     plot_points=plot_points
                 ):
-                    plot_points = self._get_histogram_values(
+                    file_id_plot_points_map[file_id] = self._get_histogram_values(
                         tick_labels=tick_labels.get(file_id,
                                                     {'x-axis': [], 'y-axis': []}),
                         plot_points=plot_points
                     )
+                else:
+                    file_id_plot_points_map[file_id] = plot_points
             except: # noqa E772 unknown error
                 pass
-            file_id_plot_points_map[file_id] = plot_points
         return file_id_plot_points_map
 
     @staticmethod
