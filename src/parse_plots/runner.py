@@ -228,11 +228,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         [x[1] for x in plot_points_][::-1]))
                 file_id_plot_values_map[file_id] = plot_points_
 
-                duration = time.time() - start
-                self.logger.info(
-                    f'Finished in {duration:.0f} seconds, '
-                    f'{(n_batches - batch_idx) * duration:.0f} '
-                    f'seconds remaining')
+            duration = time.time() - start
+            self.logger.info(
+                f'Finished in {duration:.0f} seconds, '
+                f'{(n_batches - batch_idx) * duration:.0f} '
+                f'seconds remaining')
             data_series = self._construct_data_series(
                 plot_types=plot_types,
                 file_id_plot_values_map=file_id_plot_values_map
