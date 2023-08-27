@@ -522,7 +522,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
     ):
         # resizing since segmentation model trained with 256x256, and
         # axes segmentation model trained with 448x448
-        line_plot_mask = T.Resize([448, 448])(line_plot_mask)
+        line_plot_mask = T.Resize([448, 448], antialias=True)(line_plot_mask)
         line_plot_mask = line_plot_mask.squeeze()
 
         plot_vals = []

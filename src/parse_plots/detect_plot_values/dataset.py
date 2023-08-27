@@ -19,7 +19,7 @@ from torchvision.utils import draw_keypoints
 
 from torchvision.transforms.v2 import functional as F
 
-from parse_plots.utils import string_to_float, resize_plot_bounding_box
+from parse_plots.utils import string_to_float
 
 torchvision.disable_beta_transforms_warning()
 
