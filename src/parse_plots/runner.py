@@ -550,6 +550,8 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             if (line_plot_mask[:, x_val] == 0).all():
                 # mask is missing here. find nearest point
                 mask_vals = torch.where(line_plot_mask)
+                if len(mask_vals[1]) == 0:
+                    continue
                 new_x_val = (
                     mask_vals[1][(mask_vals[1] - x_val).abs()
                                                        .argsort()[0]]
