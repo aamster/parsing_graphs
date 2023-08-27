@@ -97,7 +97,11 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             )
         self._classify_plot_type_model = self.classify_plot_type_model
         self._detect_axes_labels_model = self.detect_axes_labels_model
-        self._trainer = Trainer()
+        self._trainer = Trainer(
+            logger=False,
+            enable_model_summary=False,
+            enable_progress_bar=False
+        )
 
     def _initialize_logger(self):
         for handler in logging.root.handlers[:]:
