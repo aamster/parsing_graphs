@@ -182,7 +182,13 @@ class DetectText:
 
         expected_type = plot_expected_type_map[plot_type][axis]
         if expected_type == 'numeric' or 'numeric' in expected_type:
-            axis_text = [try_convert_numeric(x=x) for x in axis_text]
+            axis_text = []
+            for x in axis_text:
+                try:
+                    x = try_convert_numeric(x=x)
+                except ValueError:
+                    pass
+                axis_text.append(x)
             numeric_frac = sum([isinstance(x, (int, float)) for x in axis_text]) \
                 / len(axis_text)
             # if it is numeric or more than half are numeric, assume it is
