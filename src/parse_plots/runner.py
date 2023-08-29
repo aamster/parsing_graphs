@@ -337,9 +337,14 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                         axis_diff = abs(
                             tick_labels[file_id][f'{axis}-axis'][0] -
                             tick_labels[file_id][f'{axis}-axis'][1])
-                        diff_from_closest_tick_val = \
-                            abs(closest_tick_pt['tick_pt'] -
-                                coord[axis_idx]) / axis_spacing * axis_diff
+
+                        if axis_spacing * axis_diff == 0:
+                            # this is an error case. 
+                            diff_from_closest_tick_val = 0
+                        else:
+                            diff_from_closest_tick_val = \
+                                abs(closest_tick_pt['tick_pt'] -
+                                    coord[axis_idx]) / axis_spacing * axis_diff
 
                         if axis == 'y':
                             # coordinates increase but values decrease
