@@ -74,7 +74,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             plot_ids = plot_ids[:self.args['debug_num']]
-            #plot_ids = ['0b160cb2f74d']
+            plot_ids = ['f139abfed145']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -339,7 +339,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                             tick_labels[file_id][f'{axis}-axis'][1])
 
                         if axis_spacing * axis_diff == 0:
-                            # this is an error case. 
+                            # this is an error case.
                             diff_from_closest_tick_val = 0
                         else:
                             diff_from_closest_tick_val = \
@@ -884,7 +884,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     if x[axis_idx] != 'HISTOGRAM_PLACEHOLDER'])
                 res.append({
                     'id': f'{file_id}_{axis}',
-                    'data_series': data_series,
+                    'data_series': data_series or '0',
                     'chart_type': plot_types[file_id]
                 })
         return res

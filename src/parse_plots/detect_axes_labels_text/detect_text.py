@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 plot_expected_type_map = {
     'vertical_bar': {
-        'x-axis': ['categorical'],
+        'x-axis': 'categorical',
         'y-axis': 'numeric'
     },
     'horizontal_bar': {
@@ -213,8 +213,10 @@ class DetectText:
                             axis_text = [
                                 axis_text[i] if i in numeric_text_idx else preds[i]
                                 for i in range(len(axis_text))]
+                        else:
+                            axis_text = [0]
                     except: # noqa e722 unknown error
-                        pass
+                        axis_text = [0]
 
         if all(is_numeric(x) for x in axis_text) and len(axis_text) > 1:
             try:
