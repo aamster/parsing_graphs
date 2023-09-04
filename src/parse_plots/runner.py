@@ -74,7 +74,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
         plot_ids = [Path(x).stem for x in plot_files]
         if self.args['is_debug']:
             plot_ids = plot_ids[:self.args['debug_num']]
-            plot_ids = ['f139abfed145']
+            plot_ids = ['7e6e3c247c33', 'histogram_example']
         self._plot_ids = plot_ids
         self._is_debug = self.args['is_debug']
         self._segment_line_plot_model = \
@@ -241,7 +241,26 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
             all_data_series.append(data_series)
 
         out_path = Path(self.args['out_dir']) / 'submission.csv'
-        pd.concat(all_data_series).to_csv(out_path, index=False)
+        res = pd.concat(all_data_series)
+
+        if res.empty:
+            missing = self._plot_ids
+        else:
+            missing = list(set(self._plot_ids).difference(
+                set(res['id'].str.replace('_x', '').str.replace('_y', ''))))
+        missing_x = pd.DataFrame({
+            'id': f'{image_id}_x',
+            'data_series': '0',
+            'chart_type': 'line'
+        } for image_id in missing)
+        missing_y = pd.DataFrame({
+            'id': f'{image_id}_y',
+            'data_series': '0',
+            'chart_type': 'line'
+        } for image_id in missing)
+        res = pd.concat([res, missing_x, missing_y])
+
+        res.to_csv(out_path, index=False)
         self.logger.info(f'Wrote submission to {out_path}')
 
     def _detect_plot_values(
@@ -884,7 +903,7 @@ class ParsePlotsRunner(argschema.ArgSchemaParser):
                     if x[axis_idx] != 'HISTOGRAM_PLACEHOLDER'])
                 res.append({
                     'id': f'{file_id}_{axis}',
-                    'data_series': data_series or '0',
+                    'data_series': data_series,
                     'chart_type': plot_types[file_id]
                 })
         return res

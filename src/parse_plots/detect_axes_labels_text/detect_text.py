@@ -213,10 +213,8 @@ class DetectText:
                             axis_text = [
                                 axis_text[i] if i in numeric_text_idx else preds[i]
                                 for i in range(len(axis_text))]
-                        else:
-                            axis_text = [0]
                     except: # noqa e722 unknown error
-                        axis_text = [0]
+                        pass
 
         if all(is_numeric(x) for x in axis_text) and len(axis_text) > 1:
             try:
